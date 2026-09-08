@@ -20,7 +20,7 @@ export default function DiagnosticoDoc({ processo }: { processo: Processo }) {
 
   return (
     <DocumentShell title="Documento de Diagnóstico" numero={processo.numero}>
-      <div className="mb-5 grid grid-cols-4 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4 print:grid-cols-4">
         <Field label="Cliente" value={cliente.nome} />
         <Field label="Viatura" value={`${viatura.matricula} — ${viatura.marca} ${viatura.modelo}`} />
         <Field label="Mecânico responsável" value={mecanico?.nome} />

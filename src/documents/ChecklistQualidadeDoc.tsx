@@ -17,7 +17,7 @@ export default function ChecklistQualidadeDoc({ processo }: { processo: Processo
 
   return (
     <DocumentShell title="Checklist de Controlo de Qualidade" numero={processo.numero}>
-      <div className="mb-5 grid grid-cols-3 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 print:grid-cols-3">
         <Field label="Cliente" value={cliente.nome} />
         <Field label="Viatura" value={`${viatura.matricula} — ${viatura.marca} ${viatura.modelo}`} />
         <Field label="Responsável pela validação" value={responsavel?.nome ?? '—'} />
