@@ -89,7 +89,7 @@ export default function Pecas() {
       >
         <div className="space-y-3">
           <input placeholder="Nome da peça" className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-mzd-red focus:ring-1 focus:ring-mzd-red" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input placeholder="Categoria" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-mzd-red focus:ring-1 focus:ring-mzd-red" />
             <input placeholder="Fornecedor" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-mzd-red focus:ring-1 focus:ring-mzd-red" />
             <input placeholder="Preço-base (Kz)" className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-mzd-red focus:ring-1 focus:ring-mzd-red" />

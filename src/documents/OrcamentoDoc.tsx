@@ -16,7 +16,7 @@ export default function OrcamentoDoc({ processo }: { processo: Processo }) {
 
   return (
     <DocumentShell title="Orçamento / Fatura Pró-forma" subtitle={`Válido por ${o.validadeDias} dias`} numero={processo.numero}>
-      <div className="mb-5 grid grid-cols-3 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 print:grid-cols-3">
         <Field label="Cliente" value={cliente.nome} />
         <Field label="NIF" value={cliente.nif} />
         <Field label="Viatura" value={`${viatura.matricula} — ${viatura.marca} ${viatura.modelo}`} />

@@ -23,8 +23,8 @@ export default function DocumentShell({
         </button>
       </div>
 
-      <div className="px-8 py-8 text-[13px] text-mzd-black">
-        <header className="mb-6 flex items-start justify-between border-b-2 border-mzd-black pb-4">
+      <div className="px-4 py-6 text-[13px] text-mzd-black sm:px-8 sm:py-8 print:px-8 print:py-8">
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b-2 border-mzd-black pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-mzd-red to-mzd-redDark font-black text-white">M</div>
             <div>
