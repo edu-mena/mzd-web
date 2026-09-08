@@ -1,11 +1,11 @@
-import { Search, Bell, ChevronDown } from 'lucide-react';
+import { Search, Bell, ChevronDown, Menu } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clientes, viaturas, processos, utilizadores } from '../../data/mock';
 import { PERFIL_LABEL } from '../../types';
 import { useUser } from '../../context/UserContext';
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
@@ -21,8 +21,16 @@ export default function Topbar() {
     : [];
 
   return (
-    <header className="no-print flex h-16 shrink-0 items-center gap-4 border-b border-zinc-200 bg-white px-6">
-      <div className="relative w-full max-w-md">
+    <header className="no-print flex h-16 shrink-0 items-center gap-2 border-b border-zinc-200 bg-white px-4 sm:gap-4 sm:px-6">
+      <button
+        onClick={onMenuClick}
+        className="-ml-1 shrink-0 rounded-lg p-2 text-mzd-gray hover:bg-zinc-100 hover:text-mzd-black lg:hidden"
+        aria-label="Abrir menu"
+      >
+        <Menu size={20} />
+      </button>
+
+      <div className="relative w-full min-w-0 max-w-md">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-mzd-gray" />
         <input
           value={query}
@@ -48,7 +56,7 @@ export default function Topbar() {
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3">
         <button className="relative rounded-lg p-2 text-mzd-gray hover:bg-zinc-100 hover:text-mzd-black">
           <Bell size={18} />
           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-mzd-red" />
@@ -58,16 +66,16 @@ export default function Topbar() {
           <button
             onClick={() => setUserMenu((o) => !o)}
             onBlur={() => setTimeout(() => setUserMenu(false), 150)}
-            className="flex items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-2.5 hover:bg-zinc-100"
+            className="flex items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-1.5 hover:bg-zinc-100 sm:pr-2.5"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-mzd-black text-xs font-bold text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-mzd-black text-xs font-bold text-white">
               {user.avatarIniciais}
             </span>
-            <span className="text-left">
+            <span className="hidden text-left sm:block">
               <p className="text-xs font-bold leading-tight text-mzd-black">{user.nome}</p>
               <p className="text-[11px] leading-tight text-mzd-gray">{PERFIL_LABEL[user.perfil]}</p>
             </span>
-            <ChevronDown size={14} className="text-mzd-gray" />
+            <ChevronDown size={14} className="hidden text-mzd-gray sm:block" />
           </button>
           {userMenu && (
             <div className="absolute right-0 z-40 mt-1.5 w-64 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xl">

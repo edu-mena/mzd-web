@@ -56,7 +56,7 @@ export default function Processos() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[240px] max-w-sm">
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-mzd-gray" />
           <input
             value={query}
@@ -217,18 +217,18 @@ function ListaTabela({ processos: lista, selected, toggleSelect }: { processos: 
 
 function NovoProcessoForm() {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="Nome do cliente" placeholder="Ex: António Ferreira" />
       <Field label="Telefone" placeholder="+244 9xx xxx xxx" />
       <Field label="Matrícula" placeholder="LD-00-00-AA" />
       <Field label="Marca / Modelo" placeholder="Toyota Hilux" />
       <Field label="Ano" placeholder="2020" />
       <Field label="Quilometragem" placeholder="85 000 km" />
-      <div className="col-span-2">
+      <div className="sm:col-span-2">
         <label className="mb-1 block text-xs font-semibold text-mzd-gray">Queixa relatada pelo cliente</label>
         <textarea rows={3} placeholder="Descreva o problema relatado…" className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-mzd-red focus:ring-1 focus:ring-mzd-red" />
       </div>
-      <div className="col-span-2 rounded-lg border border-dashed border-zinc-300 p-4 text-center text-xs text-mzd-gray">
+      <div className="sm:col-span-2 rounded-lg border border-dashed border-zinc-300 p-4 text-center text-xs text-mzd-gray">
         Mapa de danos (topo/perfil) — clique na viatura para marcar riscos/mossas
       </div>
     </div>

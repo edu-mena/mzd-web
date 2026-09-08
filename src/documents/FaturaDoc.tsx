@@ -13,7 +13,7 @@ export default function FaturaDoc({ processo }: { processo: Processo }) {
 
   return (
     <DocumentShell title="Fatura / Recibo" numero={fat?.numero ?? processo.numero}>
-      <div className="mb-5 grid grid-cols-3 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 print:grid-cols-3">
         <Field label="Cliente" value={cliente.nome} />
         <Field label="NIF" value={cliente.nif} />
         <Field label="Data" value={fat ? formatDate(fat.data) : '—'} />
