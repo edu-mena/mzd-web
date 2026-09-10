@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Printer } from 'lucide-react';
+import logoMzd from '../assets/logo.png';
 
 export default function DocumentShell({
   title,
@@ -25,13 +26,9 @@ export default function DocumentShell({
 
       <div className="px-4 py-6 text-[13px] text-mzd-black sm:px-8 sm:py-8 print:px-8 print:py-8">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b-2 border-mzd-black pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-mzd-red to-mzd-redDark font-black text-white">M</div>
-            <div>
-              <p className="text-base font-extrabold leading-tight">GRUPO MZD</p>
-              <p className="text-xs font-semibold leading-tight text-mzd-gray">MZD Carros e Motores</p>
-              <p className="text-[10px] leading-tight text-mzd-gray">Luanda, Angola · +244 923 000 000 · geral@mzdcarros.ao</p>
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <img src={logoMzd} alt="Grupo MZD — MZD Carros e Motores" className="h-12 w-auto" />
+            <p className="text-[10px] leading-tight text-mzd-gray">Luanda, Angola · +244 923 000 000 · geral@mzdcarros.ao</p>
           </div>
           <div className="text-right">
             <h1 className="text-sm font-extrabold uppercase tracking-wide text-mzd-red">{title}</h1>

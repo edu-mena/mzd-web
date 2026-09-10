@@ -6,6 +6,7 @@ import {
 import { useState } from 'react';
 import clsx from 'clsx';
 import { processos } from '../../data/mock';
+import iconMzd from '../../assets/icon.png';
 
 const primary = [
   { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
@@ -55,9 +56,11 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
         )}
       >
         <div className="flex items-center gap-2.5 px-4 py-5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-mzd-red to-mzd-redDark font-black text-white">
-            M
-          </div>
+          <img
+            src={iconMzd}
+            alt="MZD"
+            className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5"
+          />
           {!compact && (
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-extrabold tracking-tight">GRUPO MZD</p>
