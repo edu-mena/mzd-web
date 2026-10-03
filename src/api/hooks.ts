@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from './endpoints';
 import type { NovaMensagem, NovoProcesso } from './endpoints';
-import type { Configuracao, ModeloMensagem, ProcessoDetalhado } from '../types';
+import type { Configuracao, ModeloMensagem, Notificacao, ProcessoDetalhado } from '../types';
 
 // Chaves de cache centralizadas, para invalidar de forma consistente após alterações.
 export const chaves = {
@@ -222,6 +222,8 @@ export function useMarcarNotificacoes() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids?: string[]) => api.notificacoes.marcarLidas(ids),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
+    // Fica lida logo no clique; o servidor confirma a seguir.
+    onMutate: (ids) => qc.setQueryData<Notificacao[]>(['notificacoes'], (l) => l?.map((n) => (!ids || ids.includes(n.id) ? { ...n, lida: true } : n))),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
   });
 }
