@@ -1,0 +1,1 @@
+import{p as e,t}from"./clsx-D733-jEk.js";import{n}from"./format-Dm3iBnz8.js";var r=e();function i({valor:e,className:i}){return(0,r.jsx)(`span`,{className:t(`num whitespace-nowrap`,i),children:n(e)})}export{i as t};

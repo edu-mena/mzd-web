@@ -1,0 +1,42 @@
+# MZD — configuração Apache para a Hostinger (copiada para a raiz do site no build).
+
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # A API PHP (pasta /api) é tratada pelo próprio PHP.
+  RewriteRule ^api/ - [L]
+
+  # Ficheiros e pastas que existem são servidos diretamente.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Todas as outras rotas pertencem à aplicação React.
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Nunca servir ficheiros de configuração ou ocultos (.env, .git, etc.).
+<FilesMatch "^\.|\.(env|ini|log|sql|sh|bak)$">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(self)"
+
+  # index.html nunca em cache (para as atualizações aparecerem logo);
+  # os ficheiros gerados pelo build têm um hash no nome e podem ficar em cache um ano.
+  # (FilesMatch em vez de <If>, por compatibilidade com o LiteSpeed da Hostinger.)
+  <FilesMatch "index\.html$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "-[A-Za-z0-9_-]{8}\.(js|css|png|jpg|svg|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

@@ -1,0 +1,1 @@
+var e=`/assets/logo-Cx1xrMwV.png`;export{e as t};
