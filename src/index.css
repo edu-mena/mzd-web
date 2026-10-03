@@ -1,0 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400..700&display=swap');
+@import 'tailwindcss';
+
+/*
+  Sistema visual MZD — "ficha de oficina de precisão".
+  - Papel quente, linhas finas, painéis sem sombra.
+  - O vermelho é sinal: marca, atrasos e situações críticas. Ações principais em tinta (negro).
+  - Archivo semi-expandida para títulos; Instrument Sans para texto; IBM Plex Mono para dados
+    (matrículas, nº de processo, valores) com algarismos alinhados.
+*/
+
+@theme {
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Archivo', 'Instrument Sans', ui-sans-serif, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* Marca */
+  --color-mzd-red: #e60000;
+  --color-mzd-redDark: #b80000;
+  --color-mzd-black: #141414;
+  --color-mzd-graphite: #2a2a28;
+  /* Texto secundário: cinzento quente com contraste ≥ 4.5:1 sobre o papel */
+  --color-mzd-gray: #66645e;
+
+  /* Superfícies e linhas */
+  --color-papel: #f3f2ee;
+  --color-superficie: #ffffff;
+  --color-linha: #e2e0d9;
+  --color-linha-forte: #c9c6bd;
+
+  /* Sinais (texto / fundo) */
+  --color-sinal-vermelho: #c20000;
+  --color-sinal-vermelho-fundo: #fdecea;
+  --color-sinal-ambar: #9a4a00;
+  --color-sinal-ambar-fundo: #fdf1df;
+  --color-sinal-verde: #176b3a;
+  --color-sinal-verde-fundo: #e6f3ea;
+
+  /* A escala "zinc" passa a ser o neutro quente do sistema (usado em bordas, fundos e hovers). */
+  --color-zinc-50: #f8f7f4;
+  --color-zinc-100: #efeee9;
+  --color-zinc-200: #e2e0d9;
+  --color-zinc-300: #c9c6bd;
+  --color-zinc-400: #9c9990;
+  --color-zinc-500: #77746c;
+  --color-zinc-600: #5c5a54;
+  --color-zinc-700: #43423d;
+  --color-zinc-800: #2a2a28;
+  --color-zinc-900: #1c1c1a;
+
+  --shadow-card: none;
+  --shadow-flutuante: 0 12px 32px -8px rgb(20 20 20 / 0.18), 0 2px 6px rgb(20 20 20 / 0.06);
+
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+
+  /* "backwards" e não "both": uma animação de transform que fica em vigor faz do elemento o
+     contentor dos filhos position:fixed (modais, gavetas) e prende-os dentro dele. */
+  --animate-entrada: entrada 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  @keyframes entrada {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes entrada-lado {
+    from { opacity: 0.6; transform: translateX(24px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--color-papel);
+    color: var(--color-mzd-black);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-stretch: 112%;
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-mzd-black);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-mzd-black);
+    color: white;
+  }
+}
+
+@layer components {
+  /* Rótulos de secção: maiúsculas pequenas, expandidas */
+  .rotulo {
+    font-family: var(--font-display);
+    font-stretch: 118%;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-mzd-gray);
+  }
+
+  /* Dados: algarismos alinhados para tabelas e valores */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Entrada escalonada do conteúdo de cada página */
+  .pagina > * {
+    animation: var(--animate-entrada);
+  }
+  .pagina > :nth-child(2) { animation-delay: 40ms; }
+  .pagina > :nth-child(3) { animation-delay: 80ms; }
+  .pagina > :nth-child(4) { animation-delay: 120ms; }
+  .pagina > :nth-child(n + 5) { animation-delay: 160ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-zinc-300); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-400); }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .pagina > * { animation: none; }
+}

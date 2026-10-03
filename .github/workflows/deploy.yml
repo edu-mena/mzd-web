@@ -1,0 +1,31 @@
+# Verificação contínua: cada push para "main" tem de passar o lint e compilar.
+#
+# O deploy é feito pela própria Hostinger, que está ligada ao ramo "main", compila o projecto
+# (npm install + npm run build) e publica a pasta dist/. Este workflow só garante que nada partido
+# chega ao main sem se dar por isso.
+
+name: Verificação
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
