@@ -340,7 +340,8 @@ export interface Garantia {
 export interface Cancelamento {
   motivo: string;
   data: string;
-  autorId: string;
+  /** Vazio quando foi o próprio cliente a recusar no portal. */
+  autorId?: string;
   /** Estado em que o processo estava quando foi cancelado. */
   estadoAnterior: EstadoProcesso;
 }
@@ -384,6 +385,8 @@ export interface Processo {
   garantias?: Garantia[];
   entrega?: Entrega;
   cancelamento?: Cancelamento;
+  /** Link pessoal de acompanhamento para o cliente (só visível a quem envia mensagens). */
+  portal?: AcessoPortal;
   historico: HistoricoEvento[];
 }
 
@@ -675,4 +678,68 @@ export interface Notificacao {
   texto: string;
   link?: string;
   lida: boolean;
+}
+
+// ---------- Portal do cliente ----------
+
+export interface AcessoPortal {
+  /** Segredo aleatório do link /p/{token}. Renovar invalida o anterior. */
+  token: string;
+  criadoEm: string;
+  ultimoAcesso?: string;
+  acessos: number;
+}
+
+/** Nomes das etapas como o cliente as entende. */
+export const ESTADO_CLIENTE: Record<EstadoProcesso, string> = {
+  recepcao: 'Recebida',
+  diagnostico: 'Em diagnóstico',
+  orcamentacao: 'Orçamento em preparação',
+  aguarda_aprovacao: 'À espera da sua aprovação',
+  em_reparacao: 'Em reparação',
+  controlo_qualidade: 'Verificação final',
+  pronta_entrega: 'Pronta a levantar',
+  entregue: 'Entregue',
+  cancelado: 'Cancelado',
+};
+
+interface LinhasPortal {
+  pecas: { descricao: string; quantidade: number; precoUnitario: number }[];
+  maoObra: { descricao: string; horas: number; valorHora: number }[];
+  taxaIva: number;
+}
+
+/**
+ * O que o cliente vê no portal: só dados do seu processo, sem custos, notas internas,
+ * nomes da equipa nem histórico interno.
+ */
+export interface PortalProcesso {
+  numero: string;
+  estado: EstadoProcesso;
+  criadoEm: string;
+  prazoEntrega: string;
+  aguardaPecas: boolean;
+  cliente: { nome: string };
+  viatura: { matricula: string; marca: string; modelo: string };
+  oficina: { nome: string; telefone: string; email: string; morada: string; iban?: string };
+  queixa: string;
+  /** Data de entrada em cada etapa já percorrida. */
+  etapas: { estado: EstadoProcesso; data: string }[];
+  diagnostico?: { problemas: { sistema: string; gravidade: 'atencao' | 'critico'; observacao?: string }[]; parecer: string; concluidoEm?: string };
+  orcamento?: LinhasPortal & {
+    validadeDias: number;
+    condicoesPagamento: string;
+    enviadoEm?: string;
+    validoAte?: string;
+    expirado: boolean;
+    estado: Orcamento['estado'];
+    descontoPct?: number;
+  };
+  autorizacao?: { data: string; metodo: MetodoAprovacao; autorizadoPor: string };
+  adicionais: (LinhasPortal & { id: string; justificacao: string; criadoEm: string; estado: OrcamentoAdicional['estado'] })[];
+  progresso?: { feitas: number; total: number };
+  valores?: { total: number; pago: number; aPagar: number; fatura?: string };
+  entregueEm?: string;
+  canceladoEm?: string;
+  fotos: Anexo[];
 }

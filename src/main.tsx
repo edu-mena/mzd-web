@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       refetchOnWindowFocus: true,
-      retry: (n, erro) => !(erro instanceof ApiError && [401, 403, 404].includes(erro.status)) && n < 2,
+      retry: (n, erro) => !(erro instanceof ApiError && [401, 403, 404, 410].includes(erro.status)) && n < 2,
     },
   },
 });

@@ -6,7 +6,7 @@ import type { Metodo } from '../client';
 import { db, guardar } from './db';
 import type { UtilizadorComSenha } from './seed';
 import {
-  auditar, detalhar, exigir, exigirEstado, novoId, numero, obterProcesso, registarHistorico, texto, umDe,
+  auditar, detalhar, exigir, exigirEstado, novoAcessoPortal, novoId, numero, obterProcesso, registarHistorico, texto, umDe,
 } from './contexto';
 import type { Handler } from './contexto';
 import { criarCliente, criarViatura, validarCliente, validarViatura } from './clientes';
@@ -16,8 +16,9 @@ import { avaliarDesconto, exigirCaixaAberta, proximoRecibo } from './financeiro'
 import { notificar, notificarMudanca } from './comunicacoes';
 import { can, PERMISSAO_ETAPA } from '../../auth/permissions';
 import { calcularTotais, faturaPaga, recebidoProcesso, saldoEmAberto, totalFaturavel } from '../../lib/calculos';
-import { ESTADOS_ORDEM, ESTADO_LABEL, estaAtivo } from '../../types';
+import { ESTADOS_ORDEM, ESTADO_LABEL, METODO_APROVACAO_LABEL, estaAtivo } from '../../types';
 import type {
+  Autorizacao, OrcamentoAdicional,
   Cliente, FinalidadeAnexo, FormaPagamento, ItemOrcamentoMaoObra, ItemOrcamentoPeca, MetodoAprovacao, Pagamento, Processo, Tarefa, Viatura,
 } from '../../types';
 
@@ -96,12 +97,50 @@ function emitirFatura(p: Processo) {
   ];
 }
 
-function mudarEstado(p: Processo, u: UtilizadorComSenha, proximo: Processo['estado'], descricao?: string) {
+/** Quem faz a ação: um utilizador da equipa ou o cliente no portal (id nulo). */
+export interface AutorAcao { id: string | null; nome: string }
+
+function mudarEstado(p: Processo, u: AutorAcao, proximo: Processo['estado'], descricao?: string) {
   const anterior = p.estado;
   p.estado = proximo;
   registarHistorico(p, u.nome, descricao ?? `Processo avançou para "${ESTADO_LABEL[proximo]}"`, 'estado', proximo);
   auditar(u.id, 'mudar_estado', 'processo', p.id, proximo);
-  notificarMudanca(p, anterior, u.id);
+  notificarMudanca(p, anterior, u.id ?? undefined);
+}
+
+// ---------- Decisões do cliente (registadas na oficina ou no portal) ----------
+
+/** Aprovação do diagnóstico + orçamento: gera as tarefas e passa à reparação. Validar tudo antes de chamar. */
+export function aprovarOrcamento(p: Processo, autor: AutorAcao, autorizacao: Omit<Autorizacao, 'valorTotal' | 'data'>) {
+  p.autorizacao = { ...autorizacao, valorTotal: calcularTotais(p.orcamento).total, data: new Date().toISOString() };
+  p.orcamento!.estado = 'aprovado';
+  p.tarefas = gerarTarefas(p.orcamento!.pecas, p.orcamento!.maoObra);
+  mudarEstado(p, autor, 'em_reparacao', `Aprovado pelo cliente (${METODO_APROVACAO_LABEL[autorizacao.metodo].toLowerCase()}) — reparação iniciada`);
+  // Só depois de passar a "em reparação" as peças contam como reservadas.
+  verificarFaltas(p, autor.nome);
+}
+
+/** Recusa do orçamento: o processo é cancelado. */
+export function recusarOrcamento(p: Processo, autor: AutorAcao, motivo: string) {
+  p.orcamento!.estado = 'recusado';
+  p.orcamento!.motivoRecusa = motivo;
+  p.cancelamento = { motivo: `Orçamento recusado: ${motivo}`, data: new Date().toISOString(), autorId: autor.id ?? undefined, estadoAnterior: 'aguarda_aprovacao' };
+  p.estado = 'cancelado';
+  registarHistorico(p, autor.nome, `Orçamento recusado pelo cliente (${motivo}). Processo cancelado.`, 'cancelamento', 'cancelado');
+  auditar(autor.id, 'recusa_cliente', 'processo', p.id, motivo);
+  notificarMudanca(p, 'aguarda_aprovacao', autor.id ?? undefined);
+}
+
+export function decidirAdicional(p: Processo, a: OrcamentoAdicional, autor: AutorAcao, decisao: 'aprovado' | 'recusado', metodo: MetodoAprovacao, autorizadoPor: string) {
+  a.estado = decisao;
+  a.decisao = { metodo, data: new Date().toISOString(), autorizadoPor };
+  if (decisao === 'aprovado') {
+    p.tarefas = [...(p.tarefas ?? []), ...gerarTarefas(a.pecas, a.maoObra, a.id)];
+    verificarFaltas(p, autor.nome);
+  }
+  registarHistorico(p, autor.nome, `Trabalho adicional ${decisao} pelo cliente`, decisao === 'aprovado' ? 'nota' : 'rejeicao');
+  auditar(autor.id, `adicional_${decisao}`, 'processo', p.id, metodo);
+  notificar({ utilizadores: [p.mecanicoId] }, `Trabalho adicional ${decisao}`, `${p.numero} — ${a.justificacao}`, `/processos/${p.id}`, autor.id ?? undefined);
 }
 
 /** Regras para sair de cada etapa pelo botão "Avançar". Devolve a mensagem de erro ou null. */
@@ -241,6 +280,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
         assinaturaCliente: false,
         atendenteId: u.id,
       },
+      portal: novoAcessoPortal(),
       historico: [],
     };
     registarHistorico(p, u.nome, marcacao ? 'Processo aberto na receção (cliente com marcação)' : 'Processo aberto na receção', 'estado', 'recepcao');
@@ -351,16 +391,9 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     const p = obterProcesso(params.id);
     exigirEstado(p, 'aguarda_aprovacao');
     const decisao = umDe(body?.decisao, ['aprovado', 'recusado'] as const, 'Decisão');
-    const agora = new Date().toISOString();
 
     if (decisao === 'recusado') {
-      const motivo = texto(body?.motivoRecusa, 'Motivo da recusa', 3, 300);
-      p.orcamento!.estado = 'recusado';
-      p.orcamento!.motivoRecusa = motivo;
-      p.cancelamento = { motivo: `Orçamento recusado: ${motivo}`, data: agora, autorId: u.id, estadoAnterior: 'aguarda_aprovacao' };
-      p.estado = 'cancelado';
-      registarHistorico(p, u.nome, `Orçamento recusado pelo cliente (${motivo}). Processo cancelado.`, 'cancelamento', 'cancelado');
-      auditar(u.id, 'recusa_cliente', 'processo', p.id, motivo);
+      recusarOrcamento(p, u, texto(body?.motivoRecusa, 'Motivo da recusa', 3, 300));
       return guardarEDetalhar(p, u);
     }
 
@@ -371,25 +404,16 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     const comprovativoAnexoId = metodo === 'whatsapp' || metodo === 'email'
       ? anexoValido(p, body?.comprovativoAnexoId, 'comprovativo_aprovacao', 'Anexe o comprovativo (captura da conversa ou do email) da aprovação.')
       : undefined;
-    p.autorizacao = {
-      valorTotal: calcularTotais(p.orcamento).total,
-      metodo,
-      data: agora,
-      autorizadoPor: texto(body?.autorizadoPor, 'Nome de quem autorizou', 3, 120),
-      assinaturaAnexoId,
-      comprovativoAnexoId,
-      registadoPorId: u.id,
-    };
-    p.orcamento!.estado = 'aprovado';
-    p.tarefas = gerarTarefas(p.orcamento!.pecas, p.orcamento!.maoObra);
-
+    if (metodo === 'portal') throw new ApiError(422, 'A aprovação no portal é feita pelo próprio cliente.');
+    const autorizadoPor = texto(body?.autorizadoPor, 'Nome de quem autorizou', 3, 120);
+    // Validar o adiantamento antes de alterar o processo.
+    let adiantamento: Pagamento | undefined;
     if (body?.adiantamento && Number(body.adiantamento.valor) > 0) {
       if (!can(u, 'pagamentos.registar')) throw new ApiError(403, 'Não tem permissão para registar pagamentos.');
-      p.adiantamentos = [...(p.adiantamentos ?? []), validarPagamento(body.adiantamento, p, u)];
+      adiantamento = validarPagamento(body.adiantamento, p, u);
     }
-    mudarEstado(p, u, 'em_reparacao', `Aprovado pelo cliente (${metodo}) — reparação iniciada`);
-    // Só depois de passar a "em reparação" as peças contam como reservadas.
-    verificarFaltas(p, u.nome);
+    aprovarOrcamento(p, u, { metodo, autorizadoPor, assinaturaAnexoId, comprovativoAnexoId, registadoPorId: u.id });
+    if (adiantamento) p.adiantamentos = [...(p.adiantamentos ?? []), adiantamento];
     return guardarEDetalhar(p, u);
   }],
 
@@ -481,18 +505,8 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     if (!a) throw new ApiError(404, 'Trabalho adicional não encontrado.');
     if (a.estado !== 'enviado') throw new ApiError(422, 'Este trabalho adicional já foi decidido.');
     const decisao = umDe(body?.decisao, ['aprovado', 'recusado'] as const, 'Decisão');
-    a.estado = decisao;
-    a.decisao = {
-      metodo: umDe(body?.metodo, METODOS, 'Método'),
-      data: new Date().toISOString(),
-      autorizadoPor: texto(body?.autorizadoPor, 'Nome de quem decidiu', 3, 120),
-    };
-    if (decisao === 'aprovado') {
-      p.tarefas = [...(p.tarefas ?? []), ...gerarTarefas(a.pecas, a.maoObra, a.id)];
-      verificarFaltas(p, u.nome);
-    }
-    registarHistorico(p, u.nome, `Trabalho adicional ${decisao} pelo cliente`, decisao === 'aprovado' ? 'nota' : 'rejeicao');
-    notificar({ utilizadores: [p.mecanicoId] }, `Trabalho adicional ${decisao}`, `${p.numero} — ${a.justificacao}`, `/processos/${p.id}`, u.id);
+    const metodo = umDe(body?.metodo, METODOS.filter((m) => m !== 'portal'), 'Método');
+    decidirAdicional(p, a, u, decisao, metodo, texto(body?.autorizadoPor, 'Nome de quem decidiu', 3, 120));
     return guardarEDetalhar(p, u);
   }],
 

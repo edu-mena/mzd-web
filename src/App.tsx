@@ -28,6 +28,7 @@ const Equipa = lazy(() => import('./pages/Equipa'));
 const Definicoes = lazy(() => import('./pages/Definicoes'));
 const Ajuda = lazy(() => import('./pages/Ajuda'));
 const NaoEncontrada = lazy(() => import('./pages/NaoEncontrada'));
+const PortalCliente = lazy(() => import('./pages/PortalCliente'));
 
 const protegida = (permissao: Permissao, pagina: ReactNode) => (
   <RequirePermission permissao={permissao}>{pagina}</RequirePermission>
@@ -41,6 +42,8 @@ export default function App() {
           <Suspense fallback={<EcraCarregamento />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Portal do cliente: público, o token do link é a credencial. */}
+            <Route path="/p/:token" element={<PortalCliente />} />
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={protegida('painel.ver', <Dashboard />)} />

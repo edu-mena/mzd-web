@@ -17,6 +17,7 @@ import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
 import { calcularTotais, emDivida, recebidoProcesso, totalFaturavel } from '../../lib/calculos';
 import { formatDateTime } from '../../lib/format';
+import { haQuanto } from '../../lib/datas';
 import { modeloDaEtapa } from '../../lib/mensagens';
 import ComporMensagem from '../../components/comunicacoes/ComporMensagem';
 import FormDiagnostico from './FormDiagnostico';
@@ -44,6 +45,7 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
   const toast = useToast();
   const acao = useAcaoProcesso();
   const [aberto, setAberto] = useState<Aberto>(null);
+  const [agora] = useState(() => Date.now());
   const financeiro = useAlterarFinanceiro<{ id: string }>();
   const [motivoRecusa, setMotivoRecusa] = useState<string | null>(null);
   const p = processo;
@@ -148,6 +150,12 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
         { ok: true, texto: <>Enviado ao cliente {p.orcamento?.enviadoEm && formatDateTime(p.orcamento.enviadoEm)}{verValores && <> · <Kz valor={calcularTotais(p.orcamento).total} /> com IVA</>}</> },
         { ok: false, texto: 'Decisão do cliente' },
       ];
+      if (p.portal) {
+        requisitos.splice(1, 0, {
+          ok: !!p.portal.ultimoAcesso,
+          texto: p.portal.ultimoAcesso ? `Cliente abriu o link ${haQuanto(p.portal.ultimoAcesso, agora)} — pode aprovar lá` : 'O cliente ainda não abriu o link do orçamento',
+        });
+      }
       acoes = (
         <>
           {zap}

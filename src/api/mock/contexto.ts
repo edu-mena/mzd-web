@@ -5,7 +5,7 @@ import { db, sessaoAtual } from './db';
 import type { MockDB, UtilizadorComSenha } from './seed';
 import { can } from '../../auth/permissions';
 import type { Permissao } from '../../auth/permissions';
-import type { EstadoProcesso, HistoricoEvento, Processo, ProcessoDetalhado, Utilizador } from '../../types';
+import type { AcessoPortal, EstadoProcesso, HistoricoEvento, Processo, ProcessoDetalhado, Utilizador } from '../../types';
 
 export interface Ctx {
   params: Record<string, string>;
@@ -39,6 +39,15 @@ export function novoId(seq: keyof MockDB['sequencias'], prefixo: string): string
   base.sequencias[seq] = (base.sequencias[seq] ?? 0) + 1;
   return `${prefixo}${base.sequencias[seq]}`;
 }
+
+/** Token aleatório (144 bits) do link do portal do cliente, em base64url. */
+export function gerarToken(): string {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export const novoAcessoPortal = (): AcessoPortal => ({ token: gerarToken(), criadoEm: new Date().toISOString(), acessos: 0 });
 
 export function auditar(utilizadorId: string | null, acao: string, entidade: string, entidadeId?: string, detalhe?: string) {
   const base = db();
@@ -96,6 +105,8 @@ export function detalhar(p: Processo, u: UtilizadorComSenha): ProcessoDetalhado 
     viatura: base.viaturas.find((v) => v.id === p.viaturaId)!,
     mecanico: mec ? publico(mec) : undefined,
   };
+  // O link do portal é uma credencial do cliente: só o vê quem lhe envia mensagens.
+  if (!can(u, 'mensagens.enviar')) det.portal = undefined;
   return can(u, 'valores.ver') ? det : ocultarValores(det);
 }
 

@@ -13,6 +13,7 @@ import { modeloDaEtapa } from '../lib/mensagens';
 import ComporMensagem from '../components/comunicacoes/ComporMensagem';
 import ListaMensagens from '../components/comunicacoes/ListaMensagens';
 import RegistarResposta from '../components/comunicacoes/RegistarResposta';
+import LinkPortal from '../components/comunicacoes/LinkPortal';
 import type { ProcessoDetalhado } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
@@ -359,6 +360,8 @@ function Comunicacoes({ processo }: { processo: ProcessoDetalhado }) {
   const [aberto, setAberto] = useState<'mensagem' | 'resposta' | null>(null);
   const { cliente } = processo;
   return (
+    <div className="space-y-4">
+    <LinkPortal processo={processo} />
     <Card>
       <CardHeader
         title="Mensagens com o cliente"
@@ -376,5 +379,6 @@ function Comunicacoes({ processo }: { processo: ProcessoDetalhado }) {
       {aberto === 'mensagem' && <ComporMensagem alvo={{ processoId: processo.id }} modeloInicial={modeloDaEtapa(processo)} onFechar={() => setAberto(null)} />}
       {aberto === 'resposta' && <RegistarResposta processoId={processo.id} onFechar={() => setAberto(null)} />}
     </Card>
+    </div>
   );
 }

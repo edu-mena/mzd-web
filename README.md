@@ -65,6 +65,10 @@ src/
   (SMTP da Hostinger, conta da oficina) e fica `enviada` ou `falhou`; o **WhatsApp** começa por links `wa.me`
   (o operador confirma o envio no seu WhatsApp) e passa mais tarde para a API oficial do WhatsApp Business,
   com estados entregue/lida por webhook. O destino vem sempre da ficha do cliente e exige consentimento.
+- Portal do cliente em [src/api/mock/portal.ts](src/api/mock/portal.ts): rotas públicas `/portal/{token}`, em que o
+  token (aleatório, `random_bytes`) é a credencial. O PHP deve limitar pedidos por IP nessas rotas, guardar IP e
+  user agent nas aprovações e nunca devolver mais do que a projeção `PortalProcesso`. O link expira 30 dias
+  depois da entrega. No modo de demonstração o portal só funciona no mesmo navegador (os dados são locais).
 - As notificações internas são consultadas a cada minuto (`GET /notificacoes`): o alojamento partilhado não
   mantém ligações abertas em tempo real.
 
@@ -97,7 +101,7 @@ ficheiros ocultos e de configuração e define cabeçalhos de segurança e de ca
 | F5 | Stock: reservas, baixas, custo médio, encomendas e fornecedores | ✅ |
 | F6 | Financeiro: recibos, anulações, descontos com aprovação, caixa diária, dívidas, conta corrente | ✅ |
 | F7 | Comunicações: modelos com variáveis, registo de mensagens, clientes por avisar, notificações internas | ✅ |
-| F8 | Portal do cliente | |
+| F8 | Portal do cliente: link pessoal, percurso, orçamento e aprovação online, levantamento | ✅ |
 | F9 | Painéis por perfil e relatórios | |
 | F10 | Administração do sistema | |
 | F11 | Acessibilidade, testes e acabamento | |

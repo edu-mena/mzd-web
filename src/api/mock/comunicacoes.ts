@@ -61,7 +61,7 @@ function resumoProcesso(p: Processo) {
 }
 
 /** Avisos à equipa quando um processo muda de etapa (chamado depois de mudar o estado). */
-export function notificarMudanca(p: Processo, anterior: EstadoProcesso, autorId: string) {
+export function notificarMudanca(p: Processo, anterior: EstadoProcesso, autorId?: string) {
   const link = `/processos/${p.id}`;
   const ref = resumoProcesso(p);
   const balcao: Perfil[] = ['rececionista', 'administrativa'];

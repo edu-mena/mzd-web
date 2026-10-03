@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from './endpoints';
-import type { NovaMensagem, NovoProcesso } from './endpoints';
+import type { DecisaoPortal, NovaMensagem, NovoProcesso } from './endpoints';
 import type { Configuracao, ModeloMensagem, Notificacao, ProcessoDetalhado } from '../types';
 
 // Chaves de cache centralizadas, para invalidar de forma consistente após alterações.
@@ -225,5 +225,28 @@ export function useMarcarNotificacoes() {
     // Fica lida logo no clique; o servidor confirma a seguir.
     onMutate: (ids) => qc.setQueryData<Notificacao[]>(['notificacoes'], (l) => l?.map((n) => (!ids || ids.includes(n.id) ? { ...n, lida: true } : n))),
     onSettled: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
+  });
+}
+
+// ---------- Portal do cliente ----------
+
+export const usePortal = (token: string) =>
+  useQuery({ queryKey: ['portal', token], queryFn: () => api.portal.obter(token), refetchOnWindowFocus: true });
+
+/** Decisão do cliente (orçamento ou trabalho adicional); a resposta é o portal atualizado. */
+export function useDecisaoPortal(token: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ adicionalId, ...dados }: DecisaoPortal & { adicionalId?: string }) =>
+      adicionalId ? api.portal.decidirAdicional(token, adicionalId, dados) : api.portal.decidirOrcamento(token, dados),
+    onSuccess: (p) => qc.setQueryData(['portal', token], p),
+  });
+}
+
+export function useRenovarPortal(processoId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.portal.renovar(processoId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: chaves.processo(processoId) }),
   });
 }

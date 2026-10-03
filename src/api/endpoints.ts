@@ -4,6 +4,8 @@
 import { enviarFicheiro, request } from './client';
 import type {
   Anexo,
+  AcessoPortal,
+  PortalProcesso,
   CanalMensagem,
   ChaveModelo,
   ComunicacaoPendente,
@@ -46,6 +48,16 @@ function qs(filtros: Record<string, string | undefined>) {
   Object.entries(filtros).forEach(([k, v]) => v && p.set(k, v));
   const s = p.toString();
   return s ? `?${s}` : '';
+}
+
+export interface DecisaoPortal {
+  decisao: 'aprovado' | 'recusado';
+  /** Nome de quem decide. */
+  nome: string;
+  /** Aceitação expressa do orçamento (obrigatória para aprovar). */
+  aceito?: boolean;
+  /** Motivo da recusa. */
+  motivo?: string;
 }
 
 export interface NovaMensagem {
@@ -257,6 +269,16 @@ export const api = {
     /** Saída: o servidor envia (email) ou regista (WhatsApp, fase A). Entrada: resposta do cliente registada à mão. */
     criar: (dados: NovaMensagem) => request<Mensagem>('POST', '/mensagens', dados),
     pendentes: () => request<ComunicacaoPendente[]>('GET', '/comunicacoes/pendentes'),
+  },
+  /** Rotas públicas do portal do cliente: o token do link é a credencial. */
+  portal: {
+    obter: (token: string) => request<PortalProcesso>('GET', `/portal/${encodeURIComponent(token)}`),
+    decidirOrcamento: (token: string, dados: DecisaoPortal) =>
+      request<PortalProcesso>('POST', `/portal/${encodeURIComponent(token)}/aprovacao`, dados),
+    decidirAdicional: (token: string, adicionalId: string, dados: DecisaoPortal) =>
+      request<PortalProcesso>('POST', `/portal/${encodeURIComponent(token)}/adicionais/${adicionalId}`, dados),
+    /** Equipa: gera um link novo; o anterior deixa de funcionar. */
+    renovar: (processoId: string) => request<AcessoPortal>('POST', `/processos/${processoId}/portal/renovar`),
   },
   notificacoes: {
     listar: () => request<Notificacao[]>('GET', '/notificacoes'),

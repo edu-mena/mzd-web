@@ -42,7 +42,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 10;
+export const VERSAO_DB = 11;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -326,7 +326,10 @@ export function criarSeed(): MockDB {
           return {
             sistema,
             estado: est,
-            observacao: est !== 'ok' ? pick(['Necessita substituição', 'Desgaste acentuado', 'Verificar na próxima revisão', 'Fuga detetada']) : undefined,
+            // Observação coerente com a gravidade (o cliente lê-a no portal).
+            observacao: est === 'critico'
+              ? pick(['Necessita substituição', 'Fuga detetada', 'Desgaste no limite de segurança', 'Avaria confirmada'])
+              : est === 'atencao' ? pick(['Desgaste acentuado', 'Verificar na próxima revisão', 'Ruído anómalo', 'Folga ligeira']) : undefined,
           };
         })
       : [];
@@ -525,6 +528,12 @@ export function criarSeed(): MockDB {
   // ---------- Comunicações: mensagens já enviadas e avisos à equipa ----------
   // Gerador próprio, para não alterar os restantes dados de demonstração.
   const rndMsg = seedRandom(7);
+  // Links do portal do cliente (em produção o token vem de random_bytes no servidor).
+  const rndToken = seedRandom(11);
+  const ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  processos.forEach((p) => {
+    p.portal = { token: Array.from({ length: 24 }, () => ALFABETO[Math.floor(rndToken() * 64)]).join(''), criadoEm: p.criadoEm, acessos: 0 };
+  });
   const modelos = MODELOS_PADRAO.map((m) => ({ ...m }));
   const mensagens: Mensagem[] = [];
   const minutos = (iso: string, n: number) => new Date(Math.min(new Date(iso).getTime() + n * 60000, agora - 60000)).toISOString();
@@ -561,6 +570,13 @@ export function criarSeed(): MockDB {
     }
   }
   mensagens.sort((a, b) => a.data.localeCompare(b.data)).forEach((m, i) => { m.id = `msg${i + 1}`; });
+  // Quem recebeu o link costuma abri-lo pouco depois.
+  for (const m of mensagens) {
+    const p = processos.find((x) => x.id === m.processoId);
+    if (!p?.portal || m.direcao !== 'saida' || rndMsg() < 0.3) continue;
+    p.portal.acessos += 1 + Math.floor(rndMsg() * 3);
+    p.portal.ultimoAcesso = minutos(m.data, 3 + Math.floor(rndMsg() * 90));
+  }
 
   const notificacoes: NotificacaoInterna[] = [];
   const avisar = (n: Omit<NotificacaoInterna, 'id' | 'lidaPor' | 'utilizadores' | 'perfis'> & Partial<NotificacaoInterna>) =>

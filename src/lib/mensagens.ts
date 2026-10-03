@@ -27,7 +27,13 @@ export const VARIAVEIS_MODELO: { chave: string; descricao: string; exemplo: stri
   { chave: 'oficina', descricao: 'Nome da oficina', exemplo: 'MZD Carros e Motores' },
   { chave: 'telefone_oficina', descricao: 'Telefone da oficina', exemplo: '+244 923 000 000' },
   { chave: 'iban', descricao: 'IBAN para transferências', exemplo: 'AO06 0040 0000 …' },
+  { chave: 'link', descricao: 'Link pessoal para o cliente acompanhar a viatura e aprovar orçamentos', exemplo: 'https://mzd.it.ao/p/Xk3…' },
 ];
+
+/** Endereço público do sistema (no navegador, o próprio site). */
+const origem = () => (typeof window !== 'undefined' ? window.location.origin : 'https://mzd.it.ao');
+
+export const linkPortal = (token: string) => `${origem()}/p/${token}`;
 
 const CHAVES = new Set(VARIAVEIS_MODELO.map((v) => v.chave));
 const PADRAO_VARIAVEL = /\{([a-z_]+)\}/g;
@@ -84,6 +90,7 @@ export function valoresDoContexto({ nome, config, processo: p, marcacao: m, divi
     oficina: config?.empresa.nome ?? 'MZD Carros e Motores',
     telefone_oficina: config?.empresa.telefone,
     iban: config?.empresa.iban,
+    link: p?.portal ? linkPortal(p.portal.token) : undefined,
   };
 }
 
@@ -112,7 +119,7 @@ export const MODELOS_PADRAO: ModeloMensagem[] = [
   {
     chave: 'rececao', nome: 'Viatura recebida', descricao: 'Ao abrir o processo, depois da receção.',
     assunto: '{oficina} · Processo {processo} — viatura recebida',
-    texto: 'Olá {cliente}, confirmamos a receção da sua viatura {viatura} ({matricula}) na {oficina}.\nProcesso nº {processo}.\nPrevisão de entrega: {prazo}.\n\nVamos mantê-lo informado em cada etapa.',
+    texto: 'Olá {cliente}, confirmamos a receção da sua viatura {viatura} ({matricula}) na {oficina}.\nProcesso nº {processo}.\nPrevisão de entrega: {prazo}.\n\nAcompanhe a reparação aqui: {link}',
   },
   {
     chave: 'diagnostico', nome: 'Em diagnóstico', descricao: 'Enquanto o mecânico faz o diagnóstico.',
@@ -122,22 +129,22 @@ export const MODELOS_PADRAO: ModeloMensagem[] = [
   {
     chave: 'orcamento', nome: 'Diagnóstico e orçamento', descricao: 'Com o orçamento pronto, para o cliente aprovar.',
     assunto: '{oficina} · Processo {processo} — diagnóstico e orçamento',
-    texto: 'Olá {cliente}, o diagnóstico da sua viatura {viatura} ({matricula}) está concluído.\n\nEncontrámos:\n{problemas}\n\nValor total: {total} (IVA incluído).\nOrçamento válido {validade} dias.\n\nPodemos avançar com a reparação? Responda SIM para aprovar.',
+    texto: 'Olá {cliente}, o diagnóstico da sua viatura {viatura} ({matricula}) está concluído.\n\nEncontrámos:\n{problemas}\n\nValor total: {total} (IVA incluído).\nOrçamento válido {validade} dias.\n\nVeja o detalhe e aprove aqui: {link}\nTambém pode responder SIM a esta mensagem.',
   },
   {
     chave: 'adicional', nome: 'Trabalho adicional', descricao: 'Quando aparece trabalho extra durante a reparação.',
     assunto: '{oficina} · Processo {processo} — trabalho adicional',
-    texto: 'Olá {cliente}, durante a reparação da sua viatura {matricula} encontrámos trabalho adicional necessário:\n{adicional_motivo}\n\nValor adicional: {adicional_total} (IVA incluído).\n\nPodemos avançar? Responda SIM para aprovar.',
+    texto: 'Olá {cliente}, durante a reparação da sua viatura {matricula} encontrámos trabalho adicional necessário:\n{adicional_motivo}\n\nValor adicional: {adicional_total} (IVA incluído).\n\nVeja o detalhe e decida aqui: {link}\nTambém pode responder SIM a esta mensagem.',
   },
   {
     chave: 'reparacao', nome: 'Em reparação', descricao: 'Ponto de situação durante a reparação.',
     assunto: '{oficina} · Processo {processo} — em reparação',
-    texto: 'Olá {cliente}, a reparação da sua viatura {viatura} ({matricula}) está em curso.\nPrevisão de entrega: {prazo}.',
+    texto: 'Olá {cliente}, a reparação da sua viatura {viatura} ({matricula}) está em curso.\nPrevisão de entrega: {prazo}.\nAcompanhe aqui: {link}',
   },
   {
     chave: 'pronta', nome: 'Pronta para levantamento', descricao: 'Depois do controlo de qualidade aprovado.',
     assunto: '{oficina} · Processo {processo} — viatura pronta',
-    texto: 'Olá {cliente}, a sua viatura {viatura} ({matricula}) está pronta para levantamento.\nValor a pagar: {saldo}.\n\nEstamos ao dispor de segunda a sábado, das 08h às 18h.',
+    texto: 'Olá {cliente}, a sua viatura {viatura} ({matricula}) está pronta para levantamento.\nValor a pagar: {saldo}.\nDetalhes do serviço: {link}\n\nPode levantá-la de segunda a sexta, das 07h30 às 18h, e ao sábado até às 13h.',
   },
   {
     chave: 'entregue', nome: 'Agradecimento', descricao: 'Depois da entrega, para saber como correu.',
