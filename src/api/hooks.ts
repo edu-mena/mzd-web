@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from './endpoints';
-import type { NovoProcesso } from './endpoints';
-import type { Configuracao, ProcessoDetalhado } from '../types';
+import type { NovaMensagem, NovoProcesso } from './endpoints';
+import type { Configuracao, ModeloMensagem, ProcessoDetalhado } from '../types';
 
 // Chaves de cache centralizadas, para invalidar de forma consistente após alterações.
 export const chaves = {
@@ -34,7 +34,7 @@ export function trocarSessao<T>(qc: QueryClient, utilizador: T | null) {
 interface Opcoes { enabled?: boolean }
 
 export const useClientes = (opcoes: Opcoes = {}) => useQuery({ queryKey: chaves.clientes, queryFn: api.clientes.listar, ...opcoes });
-export const useCliente = (id: string) => useQuery({ queryKey: chaves.cliente(id), queryFn: () => api.clientes.obter(id) });
+export const useCliente = (id: string) => useQuery({ queryKey: chaves.cliente(id), queryFn: () => api.clientes.obter(id), enabled: !!id });
 export const useDuplicados = (opcoes: Opcoes = {}) => useQuery({ queryKey: ['clientes', 'duplicados'], queryFn: api.clientes.duplicados, ...opcoes });
 
 /**
@@ -59,7 +59,7 @@ export const useViatura = (id: string) => useQuery({ queryKey: chaves.viatura(id
 
 export const useProcessos = (filtros: { clienteId?: string; viaturaId?: string } = {}, opcoes: Opcoes = {}) =>
   useQuery({ queryKey: chaves.processos(filtros), queryFn: () => api.processos.listar(filtros), ...opcoes });
-export const useProcesso = (id: string) => useQuery({ queryKey: chaves.processo(id), queryFn: () => api.processos.obter(id) });
+export const useProcesso = (id: string) => useQuery({ queryKey: chaves.processo(id), queryFn: () => api.processos.obter(id), enabled: !!id });
 
 export const useMarcacao = (id: string) => useQuery({ queryKey: ['marcacoes', 'id', id], queryFn: () => api.marcacoes.obter(id), enabled: !!id });
 export const useMarcacoes = (de?: string, ate?: string, opcoes: Opcoes = {}) =>
@@ -70,7 +70,10 @@ export function useAlterarMarcacao<T>() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (executar: () => Promise<T>) => executar(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['marcacoes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['marcacoes'] });
+      refrescarComunicacoes(qc);
+    },
   });
 }
 
@@ -78,8 +81,15 @@ export const useUtilizadores = () => useQuery({ queryKey: chaves.utilizadores, q
 export const usePecas = () => useQuery({ queryKey: chaves.pecas, queryFn: api.pecas.listar });
 export const useConfiguracao = () => useQuery({ queryKey: chaves.configuracao, queryFn: api.configuracao.obter, staleTime: 5 * 60_000 });
 
+/** Alterações que geram notificações internas ou mudam a lista de clientes por avisar. */
+function refrescarComunicacoes(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ['notificacoes'] });
+  qc.invalidateQueries({ queryKey: ['comunicacoes'] });
+}
+
 /** Depois de qualquer alteração a um processo: atualiza-o em cache e refresca as listas dependentes. */
 function aposAlterarProcesso(qc: QueryClient, p: ProcessoDetalhado) {
+  refrescarComunicacoes(qc);
   // Pagamentos e faturas alimentam a caixa, as dívidas e a conta corrente.
   qc.invalidateQueries({ queryKey: ['financeiro'] });
   // Tarefas de montagem e aprovações mexem no stock (baixas e reservas).
@@ -143,6 +153,7 @@ export function useAlterarFinanceiro<T>() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['financeiro'] });
       qc.invalidateQueries({ queryKey: ['processos'] });
+      refrescarComunicacoes(qc);
     },
   });
 }
@@ -163,6 +174,7 @@ export function useAlterarStock<T>() {
     mutationFn: (executar: () => Promise<T>) => executar(),
     onSuccess: () => {
       ['pecas', 'fornecedores', 'encomendas', 'movimentos', 'processos'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      refrescarComunicacoes(qc);
     },
   });
 }
@@ -172,5 +184,44 @@ export function useGuardarConfiguracao() {
   return useMutation({
     mutationFn: (dados: Configuracao) => api.configuracao.guardar(dados),
     onSuccess: (c) => qc.setQueryData(chaves.configuracao, c),
+  });
+}
+
+export const useModelos = (opcoes: Opcoes = {}) => useQuery({ queryKey: ['modelos'], queryFn: api.modelos.listar, staleTime: 5 * 60_000, ...opcoes });
+
+export function useAlterarModelo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (executar: () => Promise<ModeloMensagem>) => executar(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['modelos'] }),
+  });
+}
+
+export const useMensagens = (filtros: Parameters<typeof api.mensagens.listar>[0] = {}, opcoes: Opcoes = {}) =>
+  useQuery({ queryKey: ['comunicacoes', 'mensagens', filtros], queryFn: () => api.mensagens.listar(filtros), ...opcoes });
+export const usePendentesComunicacao = (opcoes: Opcoes = {}) =>
+  useQuery({ queryKey: ['comunicacoes', 'pendentes'], queryFn: api.mensagens.pendentes, refetchInterval: 2 * 60_000, ...opcoes });
+
+/** Envia (ou regista) uma mensagem; o histórico do processo também muda. */
+export function useEnviarMensagem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dados: NovaMensagem) => api.mensagens.criar(dados),
+    onSuccess: (m) => {
+      qc.invalidateQueries({ queryKey: ['comunicacoes'] });
+      if (m.processoId) qc.invalidateQueries({ queryKey: chaves.processo(m.processoId) });
+    },
+  });
+}
+
+/** Centro de notificações: consulta periódica (o alojamento partilhado não tem ligações em tempo real). */
+export const useNotificacoes = () =>
+  useQuery({ queryKey: ['notificacoes'], queryFn: api.notificacoes.listar, refetchInterval: 60_000, refetchIntervalInBackground: false });
+
+export function useMarcarNotificacoes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids?: string[]) => api.notificacoes.marcarLidas(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notificacoes'] }),
   });
 }

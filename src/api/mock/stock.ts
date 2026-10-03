@@ -13,6 +13,7 @@ import { db, guardar } from './db';
 import type { UtilizadorComSenha } from './seed';
 import { auditar, exigir, novoId, numero, registarHistorico, texto } from './contexto';
 import type { Handler } from './contexto';
+import { notificar } from './comunicacoes';
 import { can } from '../../auth/permissions';
 import type { Encomenda, Fornecedor, LinhaEncomenda, Peca, PecaResumo, Processo, TipoMovimento } from '../../types';
 
@@ -342,6 +343,7 @@ export const rotasStock: [Metodo, string, Handler][] = [
         p.aguardaPecas = false;
         p.notaPecas = undefined;
         registarHistorico(p, u.nome, `Peças recebidas (${e.numero}) — reparação desbloqueada`, 'nota');
+        notificar({ utilizadores: [p.mecanicoId], perfis: ['chefe_oficina'] }, 'Peças chegaram', `${p.numero} — a reparação pode continuar.`, `/processos/${p.id}`, u.id);
         desbloqueados.push(p.numero);
       }
     });

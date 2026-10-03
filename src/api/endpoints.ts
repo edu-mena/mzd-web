@@ -4,6 +4,12 @@
 import { enviarFicheiro, request } from './client';
 import type {
   Anexo,
+  CanalMensagem,
+  ChaveModelo,
+  ComunicacaoPendente,
+  Mensagem,
+  ModeloMensagem,
+  Notificacao,
   Cliente,
   ClienteResumo,
   Configuracao,
@@ -40,6 +46,17 @@ function qs(filtros: Record<string, string | undefined>) {
   Object.entries(filtros).forEach(([k, v]) => v && p.set(k, v));
   const s = p.toString();
   return s ? `?${s}` : '';
+}
+
+export interface NovaMensagem {
+  canal: CanalMensagem;
+  direcao?: 'saida' | 'entrada';
+  clienteId?: string;
+  processoId?: string;
+  marcacaoId?: string;
+  assunto?: string;
+  texto: string;
+  modelo?: ChaveModelo;
 }
 
 export type DadosPeca = Omit<Peca, 'id' | 'stock'> & { stock?: number };
@@ -228,6 +245,22 @@ export const api = {
     cancelar: (id: string) => request<Encomenda>('POST', `/encomendas/${id}/cancelar`),
     receber: (id: string, linhas: { pecaId: string; quantidadeRecebida: number }[]) =>
       request<{ encomenda: Encomenda; desbloqueados: string[] }>('POST', `/encomendas/${id}/receber`, { linhas }),
+  },
+  modelos: {
+    listar: () => request<ModeloMensagem[]>('GET', '/modelos'),
+    guardar: (chave: ChaveModelo, dados: Pick<ModeloMensagem, 'nome' | 'assunto' | 'texto'>) => request<ModeloMensagem>('PUT', `/modelos/${chave}`, dados),
+    repor: (chave: ChaveModelo) => request<ModeloMensagem>('POST', `/modelos/${chave}/repor`),
+  },
+  mensagens: {
+    listar: (filtros: { clienteId?: string; processoId?: string; marcacaoId?: string; canal?: CanalMensagem } = {}) =>
+      request<Mensagem[]>('GET', `/mensagens${qs(filtros)}`),
+    /** Saída: o servidor envia (email) ou regista (WhatsApp, fase A). Entrada: resposta do cliente registada à mão. */
+    criar: (dados: NovaMensagem) => request<Mensagem>('POST', '/mensagens', dados),
+    pendentes: () => request<ComunicacaoPendente[]>('GET', '/comunicacoes/pendentes'),
+  },
+  notificacoes: {
+    listar: () => request<Notificacao[]>('GET', '/notificacoes'),
+    marcarLidas: (ids?: string[]) => request<void>('POST', '/notificacoes/lidas', { ids }),
   },
   configuracao: {
     obter: () => request<Configuracao>('GET', '/configuracao'),

@@ -22,6 +22,7 @@ const Agenda = lazy(() => import('./pages/Agenda'));
 const Oficina = lazy(() => import('./pages/Oficina'));
 const Pecas = lazy(() => import('./pages/Pecas'));
 const Faturacao = lazy(() => import('./pages/Faturacao'));
+const Comunicacoes = lazy(() => import('./pages/Comunicacoes'));
 const Relatorios = lazy(() => import('./pages/Relatorios'));
 const Equipa = lazy(() => import('./pages/Equipa'));
 const Definicoes = lazy(() => import('./pages/Definicoes'));
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path="/agenda" element={protegida('agenda.ver', <Agenda />)} />
                 <Route path="/pecas" element={protegida('pecas.ver', <Pecas />)} />
                 <Route path="/faturacao" element={protegida('faturacao.ver', <Faturacao />)} />
+                <Route path="/comunicacoes" element={protegida('mensagens.enviar', <Comunicacoes />)} />
                 <Route path="/relatorios" element={protegida('relatorios.ver', <Relatorios />)} />
                 <Route path="/equipa" element={protegida('equipa.ver', <Equipa />)} />
                 <Route path="/definicoes" element={protegida('definicoes.gerir', <Definicoes />)} />

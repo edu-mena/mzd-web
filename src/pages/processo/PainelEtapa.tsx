@@ -10,7 +10,6 @@ import type { ProcessoDetalhado } from '../../types';
 import { ESTADO_LABEL, ESTADOS_ORDEM, PERFIL_LABEL, SISTEMAS_VEICULO } from '../../types';
 import { Card } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import { botao } from '../../components/ui/botao';
 import Kz from '../../components/ui/Kz';
 import { Field, Select, Textarea } from '../../components/ui/Form';
 import Modal from '../../components/ui/Modal';
@@ -18,7 +17,8 @@ import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
 import { calcularTotais, emDivida, recebidoProcesso, totalFaturavel } from '../../lib/calculos';
 import { formatDateTime } from '../../lib/format';
-import { linkWhatsApp, mensagemSugerida } from '../../lib/mensagens';
+import { modeloDaEtapa } from '../../lib/mensagens';
+import ComporMensagem from '../../components/comunicacoes/ComporMensagem';
 import FormDiagnostico from './FormDiagnostico';
 import { FormOrcamento } from './FormOrcamento';
 import { FormAprovacao } from './FormAprovacao';
@@ -26,7 +26,7 @@ import FormQualidade from './FormQualidade';
 import { FormEntrega, FormPagamento } from './FormPagamentoEntrega';
 import Reparacao from './Reparacao';
 
-type Aberto = 'diagnostico' | 'orcamento' | 'aprovacao' | 'qualidade' | 'pagamento' | 'entrega' | null;
+type Aberto = 'diagnostico' | 'orcamento' | 'aprovacao' | 'qualidade' | 'pagamento' | 'entrega' | 'mensagem' | null;
 
 const DESCRICAO: Partial<Record<ProcessoDetalhado['estado'], string>> = {
   recepcao: 'Atribua o mecânico responsável e inicie o diagnóstico.',
@@ -77,8 +77,8 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
   }
 
   const mecanicoBloqueado = user?.perfil === 'mecanico' && p.mecanicoId !== user.id;
-  const zap = can('clientes.ver') && p.cliente.consentimentoMensagens
-    ? <a href={linkWhatsApp(p.cliente.telefone, mensagemSugerida(p, verValores))} target="_blank" rel="noopener noreferrer" className={botao('secundario')}><MessageCircle size={15} /> Avisar por WhatsApp</a>
+  const zap = can('mensagens.enviar') && p.cliente.consentimentoMensagens
+    ? <Button variante="secundario" icone={<MessageCircle size={15} />} onClick={() => setAberto('mensagem')}>Avisar o cliente</Button>
     : null;
 
   let requisitos: { ok: boolean; texto: ReactNode }[] = [];
@@ -233,6 +233,7 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
       {aberto === 'qualidade' && <FormQualidade processo={p} onFechar={() => setAberto(null)} />}
       {aberto === 'pagamento' && <FormPagamento processo={p} onFechar={() => setAberto(null)} />}
       {aberto === 'entrega' && <FormEntrega processo={p} onFechar={() => setAberto(null)} />}
+      {aberto === 'mensagem' && <ComporMensagem alvo={{ processoId: p.id }} modeloInicial={modeloDaEtapa(p)} onFechar={() => setAberto(null)} />}
       {motivoRecusa !== null && (
         <Modal
           open

@@ -24,6 +24,8 @@ export type Permissao =
   /** Juntar clientes duplicados (irreversível). */
   | 'clientes.fundir'
   | 'viaturas.ver'
+  /** Enviar mensagens (WhatsApp/email) a clientes e ver o registo de comunicações. */
+  | 'mensagens.enviar'
   | 'agenda.ver'
   /** Criar e gerir marcações. */
   | 'agenda.gerir'
@@ -55,6 +57,7 @@ export const PERMISSAO_LABEL: Record<Permissao, string> = {
   'clientes.editar': 'Criar e editar clientes e viaturas',
   'clientes.fundir': 'Juntar clientes duplicados',
   'viaturas.ver': 'Ver viaturas',
+  'mensagens.enviar': 'Enviar mensagens a clientes',
   'agenda.ver': 'Ver agenda',
   'agenda.gerir': 'Gerir marcações',
   'pecas.ver': 'Ver peças',
@@ -75,19 +78,19 @@ export const PERMISSOES_POR_PERFIL: Record<Perfil, Permissao[]> = {
   chefe_oficina: [
     'painel.ver', 'processos.ver', 'processos.criar', 'processos.cancelar', 'processos.atribuir',
     'diagnostico.editar', 'orcamento.editar', 'aprovacao.registar', 'reparacao.executar', 'qualidade.validar', 'entrega.registar',
-    'clientes.ver', 'clientes.editar', 'viaturas.ver', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'pecas.editar',
+    'clientes.ver', 'clientes.editar', 'viaturas.ver', 'mensagens.enviar', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'pecas.editar',
     'valores.ver', 'relatorios.ver', 'equipa.ver',
   ],
   administrativa: [
     'painel.ver', 'processos.ver', 'processos.criar',
     'orcamento.editar', 'aprovacao.registar', 'pagamentos.registar', 'entrega.registar',
-    'clientes.ver', 'clientes.editar', 'clientes.fundir', 'viaturas.ver', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'pecas.editar',
+    'clientes.ver', 'clientes.editar', 'clientes.fundir', 'viaturas.ver', 'mensagens.enviar', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'pecas.editar',
     'valores.ver', 'faturacao.ver',
   ],
   rececionista: [
     'painel.ver', 'processos.ver', 'processos.criar', 'processos.atribuir',
     'orcamento.editar', 'aprovacao.registar', 'entrega.registar',
-    'clientes.ver', 'clientes.editar', 'viaturas.ver', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'valores.ver',
+    'clientes.ver', 'clientes.editar', 'viaturas.ver', 'mensagens.enviar', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'valores.ver',
   ],
   mecanico: ['painel.ver', 'processos.ver', 'diagnostico.editar', 'reparacao.executar', 'viaturas.ver', 'agenda.ver', 'pecas.ver'],
 };

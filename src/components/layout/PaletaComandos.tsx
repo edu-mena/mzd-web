@@ -34,6 +34,7 @@ const PAGINAS: { titulo: string; to: string; permissao?: Permissao; termos?: str
   { titulo: 'Viaturas', to: '/viaturas', permissao: 'viaturas.ver' },
   { titulo: 'Agenda', to: '/agenda', permissao: 'agenda.ver', termos: 'marcações calendário entregas' },
   { titulo: 'Peças e stock', to: '/pecas', permissao: 'pecas.ver', termos: 'inventário encomendas fornecedores armazém' },
+  { titulo: 'Comunicações', to: '/comunicacoes', permissao: 'mensagens.enviar', termos: 'mensagens whatsapp email avisar clientes modelos lembretes' },
   { titulo: 'Financeiro (faturas, caixa, dívidas)', to: '/faturacao', permissao: 'faturacao.ver', termos: 'faturação recibos pagamentos cobranças descontos fecho' },
   { titulo: 'Relatórios', to: '/relatorios', permissao: 'relatorios.ver' },
   { titulo: 'Equipa', to: '/equipa', permissao: 'equipa.ver' },

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MessageCircle, Pencil, Plus, Users } from 'lucide-react';
-import { useCliente, useContaCorrente, useProcessos, useViaturas } from '../api/hooks';
+import { useCliente, useContaCorrente, useMensagens, useProcessos, useViaturas } from '../api/hooks';
 import { Table, Th, Tr, Td } from '../components/ui/Table';
 import { useAuth } from '../auth/useAuth';
 import { Card, CardHeader } from '../components/ui/Card';
@@ -15,8 +15,8 @@ import { formatDate, formatAOA } from '../lib/format';
 import { calcularTotais, saldoEmAberto } from '../lib/calculos';
 import { estaAtivo } from '../types';
 import Button from '../components/ui/Button';
-import { botao } from '../components/ui/botao';
-import { linkWhatsApp } from '../lib/mensagens';
+import ComporMensagem from '../components/comunicacoes/ComporMensagem';
+import ListaMensagens from '../components/comunicacoes/ListaMensagens';
 import FormCliente from './cadastros/FormCliente';
 import FormViatura from './cadastros/FormViatura';
 import { JuntarClientes } from './cadastros/Dialogos';
@@ -28,7 +28,8 @@ export default function ClienteDetail() {
   const { data: viaturasCliente = [] } = useViaturas({ clienteId: id });
   const { data: processosCliente = [] } = useProcessos({ clienteId: id });
   const navigate = useNavigate();
-  const [aberto, setAberto] = useState<'editar' | 'viatura' | 'juntar' | null>(null);
+  const [aberto, setAberto] = useState<'editar' | 'viatura' | 'juntar' | 'mensagem' | null>(null);
+  const { data: mensagens = [] } = useMensagens({ clienteId: id }, { enabled: can('mensagens.enviar') });
   const { data: conta = [] } = useContaCorrente(id, { enabled: can('valores.ver') });
 
   if (isPending) return <Carregando />;
@@ -55,10 +56,8 @@ export default function ClienteDetail() {
         }
         acoes={
           <>
-            {cliente.consentimentoMensagens && (
-              <a href={linkWhatsApp(cliente.telefone, `Olá ${cliente.nome.split(' ')[0]}, `)} target="_blank" rel="noopener noreferrer" className={botao('secundario')}>
-                <MessageCircle size={15} /> WhatsApp
-              </a>
+            {cliente.consentimentoMensagens && can('mensagens.enviar') && (
+              <Button variante="secundario" icone={<MessageCircle size={15} />} onClick={() => setAberto('mensagem')}>Mensagem</Button>
             )}
             {can('clientes.fundir') && <Button variante="secundario" icone={<Users size={15} />} onClick={() => setAberto('juntar')}>Juntar duplicado</Button>}
             {can('clientes.editar') && <Button icone={<Pencil size={15} />} onClick={() => setAberto('editar')}>Editar</Button>}
@@ -149,6 +148,14 @@ export default function ClienteDetail() {
         </Card>
       )}
 
+      {can('mensagens.enviar') && mensagens.length > 0 && (
+        <Card>
+          <CardHeader title="Mensagens" subtitle={`${mensagens.length} registada(s) · WhatsApp e email`} />
+          <div className="max-h-[28rem] overflow-y-auto"><ListaMensagens mensagens={mensagens} /></div>
+        </Card>
+      )}
+
+      {aberto === 'mensagem' && <ComporMensagem alvo={{ clienteId: cliente.id }} modeloInicial="livre" onFechar={() => setAberto(null)} />}
       {aberto === 'editar' && <FormCliente cliente={cliente} onFechar={() => setAberto(null)} />}
       {aberto === 'viatura' && <FormViatura clienteId={cliente.id} onFechar={() => setAberto(null)} onGuardada={(v) => navigate(`/viaturas/${v.id}`)} />}
       {aberto === 'juntar' && (

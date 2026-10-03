@@ -33,3 +33,14 @@ export function horariosDoDia(dia: string): string[] {
   for (let m = 7 * 60 + 30; m <= fim; m += 30) r.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
   return r;
 }
+
+/** Tempo decorrido em linguagem corrente: "há 12 min", "há 5 h", "há 3 dias". */
+export function haQuanto(iso: string, agora: number): string {
+  const min = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 60000));
+  if (min < 1) return 'agora mesmo';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return `há ${d} dia${d > 1 ? 's' : ''}`;
+}

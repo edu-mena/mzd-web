@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Car, CarFront, Users, Wrench, CalendarDays, Package, CreditCard,
-  BarChart3, UsersRound, Settings, HelpCircle, ChevronsLeft, ChevronsRight, X,
+  BarChart3, UsersRound, Settings, HelpCircle, ChevronsLeft, ChevronsRight, X, MessagesSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
-import { useProcessos } from '../../api/hooks';
+import { usePendentesComunicacao, useProcessos } from '../../api/hooks';
 import { useAuth } from '../../auth/useAuth';
 import type { Permissao } from '../../auth/permissions';
 import { estaAtivo } from '../../types';
@@ -18,17 +18,19 @@ interface NavItem {
   icon: LucideIcon;
   permissao?: Permissao;
   end?: boolean;
-  badgeAtivos?: boolean;
+  /** Contador ao lado do nome: processos em curso ou clientes por avisar. */
+  contador?: 'ativos' | 'avisar';
 }
 
 const primary: NavItem[] = [
   { to: '/', label: 'Painel', icon: LayoutDashboard, permissao: 'painel.ver', end: true },
-  { to: '/processos', label: 'Processos', icon: Car, permissao: 'processos.ver', badgeAtivos: true },
+  { to: '/processos', label: 'Processos', icon: Car, permissao: 'processos.ver', contador: 'ativos' },
   { to: '/oficina', label: 'Oficina', icon: Wrench, permissao: 'processos.atribuir' },
   { to: '/clientes', label: 'Clientes', icon: Users, permissao: 'clientes.ver' },
   { to: '/viaturas', label: 'Viaturas', icon: CarFront, permissao: 'viaturas.ver' },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays, permissao: 'agenda.ver' },
   { to: '/pecas', label: 'Peças & Stock', icon: Package, permissao: 'pecas.ver' },
+  { to: '/comunicacoes', label: 'Comunicações', icon: MessagesSquare, permissao: 'mensagens.enviar', contador: 'avisar' },
   { to: '/faturacao', label: 'Financeiro', icon: CreditCard, permissao: 'faturacao.ver' },
 ];
 
@@ -46,7 +48,8 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
   const [collapsed, setCollapsed] = useState(false);
   const { can } = useAuth();
   const { data: processos } = useProcessos();
-  const ativos = processos?.filter((p) => estaAtivo(p.estado)).length;
+  const { data: pendentes } = usePendentesComunicacao({ enabled: can('mensagens.enviar') });
+  const contadores = { ativos: processos?.filter((p) => estaAtivo(p.estado)).length, avisar: pendentes?.length };
   const visiveis = (items: NavItem[]) => items.filter((i) => !i.permissao || can(i.permissao));
   const gestao = visiveis(secondary);
 
@@ -95,7 +98,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2">
-          <NavSection items={visiveis(primary)} compact={compact} ativos={ativos} onNavigate={onClose} />
+          <NavSection items={visiveis(primary)} compact={compact} contadores={contadores} onNavigate={onClose} />
           {gestao.length > 0 && (
             <>
               {!compact && <p className="rotulo mb-1.5 mt-6 px-3 !text-zinc-500">Gestão</p>}
@@ -123,17 +126,19 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
 function NavSection({
   items,
   compact,
-  ativos,
+  contadores,
   onNavigate,
 }: {
   items: NavItem[];
   compact: boolean;
-  ativos?: number;
+  contadores?: Partial<Record<NonNullable<NavItem['contador']>, number>>;
   onNavigate?: () => void;
 }) {
   return (
     <ul className="space-y-0.5">
-      {items.map(({ to, label, icon: Icon, end, badgeAtivos }) => (
+      {items.map(({ to, label, icon: Icon, end, contador }) => {
+        const n = contador ? contadores?.[contador] : undefined;
+        return (
         <li key={to}>
           <NavLink
             to={to}
@@ -151,12 +156,13 @@ function NavSection({
           >
             <Icon size={17} strokeWidth={1.75} className="shrink-0" />
             {!compact && <span className="truncate">{label}</span>}
-            {!compact && badgeAtivos && ativos ? (
-              <span className="num ml-auto text-[11px] font-medium text-zinc-400">{ativos}</span>
+            {!compact && n ? (
+              <span className={clsx('num ml-auto text-[11px] font-medium', contador === 'avisar' ? 'rounded bg-mzd-red px-1.5 text-white' : 'text-zinc-400')}>{n}</span>
             ) : null}
           </NavLink>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

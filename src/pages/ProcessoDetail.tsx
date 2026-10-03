@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MessageCircle, Mail, Ban } from 'lucide-react';
+import { Ban, CornerDownRight, Send } from 'lucide-react';
 import clsx from 'clsx';
-import { useAcaoProcesso, useProcesso } from '../api/hooks';
+import { useAcaoProcesso, useMensagens, useProcesso } from '../api/hooks';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/useAuth';
 import { ESTADOS_ORDEM, ESTADO_LABEL, estaAtivo } from '../types';
 import PainelEtapa from './processo/PainelEtapa';
 import Fotos from './processo/Fotos';
-import { mensagemSugerida, linkWhatsApp } from '../lib/mensagens';
+import { modeloDaEtapa } from '../lib/mensagens';
+import ComporMensagem from '../components/comunicacoes/ComporMensagem';
+import ListaMensagens from '../components/comunicacoes/ListaMensagens';
+import RegistarResposta from '../components/comunicacoes/RegistarResposta';
 import type { ProcessoDetalhado } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
-import { botao } from '../components/ui/botao';
 import StatusBadge from '../components/ui/StatusBadge';
 import Matricula from '../components/ui/Matricula';
 import Kz from '../components/ui/Kz';
@@ -24,7 +26,7 @@ import { Aviso } from '../components/ui/Controls';
 import { Field, Textarea } from '../components/ui/Form';
 import { Table, Th, Tr, Td, LinhaVazia } from '../components/ui/Table';
 import { useToast } from '../components/ui/toast-context';
-import { Carregando, ErroCarregamento } from '../components/ui/Estados';
+import { Carregando, ErroCarregamento, Vazio } from '../components/ui/Estados';
 import { mensagemErro } from '../lib/erros';
 import { formatDate, formatDateTime, diasEntre } from '../lib/format';
 import { calcularTotais } from '../lib/calculos';
@@ -142,7 +144,7 @@ export default function ProcessoDetail() {
           { id: 'fotos', label: 'Fotos', content: <Card className="p-5"><Fotos processoId={processo.id} podeEnviar={ativo} /></Card> },
           { id: 'historico', label: 'Histórico', badge: processo.historico.length, content: <Historico processo={processo} /> },
           { id: 'pecas', label: 'Peças', content: <PecasTab processo={processo} verValores={verValores} /> },
-          ...(can('clientes.ver') ? [{ id: 'comunicacoes', label: 'Comunicações', content: <Comunicacoes processo={processo} /> }] : []),
+          ...(can('mensagens.enviar') ? [{ id: 'comunicacoes', label: 'Comunicações', content: <Comunicacoes processo={processo} /> }] : []),
         ]}
       />
 
@@ -353,42 +355,26 @@ function PecasTab({ processo, verValores }: { processo: ProcessoDetalhado; verVa
 }
 
 function Comunicacoes({ processo }: { processo: ProcessoDetalhado }) {
+  const { data: mensagens, isPending } = useMensagens({ processoId: processo.id });
+  const [aberto, setAberto] = useState<'mensagem' | 'resposta' | null>(null);
   const { cliente } = processo;
-  const [msg, setMsg] = useState(() => mensagemSugerida(processo));
-  const podeEnviar = cliente.consentimentoMensagens && msg.trim().length > 0;
-  const assunto = `${processo.numero} — ${processo.viatura.matricula}`;
-
   return (
     <Card>
-      <CardHeader title="Contactar o cliente" subtitle="Abre o WhatsApp ou o email com a mensagem já preenchida" />
-      <div className="space-y-4 px-5 py-4">
-        {!cliente.consentimentoMensagens && (
-          <Aviso>Este cliente não autorizou o envio de mensagens. Registe o consentimento na ficha do cliente antes de enviar.</Aviso>
-        )}
-        <Field label="Mensagem" hint="Sugestão de acordo com a etapa atual — pode editar antes de enviar.">
-          {(a11y) => <Textarea {...a11y} rows={4} value={msg} onChange={(e) => setMsg(e.target.value)} />}
-        </Field>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={podeEnviar ? linkWhatsApp(cliente.telefone, msg) : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-disabled={!podeEnviar}
-            className={botao('primario')}
-          >
-            <MessageCircle size={15} /> WhatsApp <span className="num font-normal text-zinc-400">{cliente.telefone}</span>
-          </a>
-          {cliente.email && (
-            <a
-              href={podeEnviar ? `mailto:${cliente.email}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(msg)}` : undefined}
-              aria-disabled={!podeEnviar}
-              className={botao('secundario')}
-            >
-              <Mail size={15} /> Email <span className="font-normal text-mzd-gray">{cliente.email}</span>
-            </a>
-          )}
-        </div>
-      </div>
+      <CardHeader
+        title="Mensagens com o cliente"
+        subtitle={cliente.consentimentoMensagens ? `${cliente.nome} · ${cliente.telefone}${cliente.email ? ` · ${cliente.email}` : ''}` : 'O cliente não autorizou mensagens'}
+        action={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variante="secundario" tamanho="sm" icone={<CornerDownRight size={13} />} onClick={() => setAberto('resposta')}>Registar resposta</Button>
+            <Button tamanho="sm" icone={<Send size={13} />} onClick={() => setAberto('mensagem')} disabled={!cliente.consentimentoMensagens}>Nova mensagem</Button>
+          </div>
+        }
+      />
+      {isPending ? <Carregando /> : mensagens?.length ? <ListaMensagens mensagens={mensagens} /> : (
+        <Vazio titulo="Ainda sem mensagens">As mensagens enviadas ao cliente sobre este processo ficam registadas aqui.</Vazio>
+      )}
+      {aberto === 'mensagem' && <ComporMensagem alvo={{ processoId: processo.id }} modeloInicial={modeloDaEtapa(processo)} onFechar={() => setAberto(null)} />}
+      {aberto === 'resposta' && <RegistarResposta processoId={processo.id} onFechar={() => setAberto(null)} />}
     </Card>
   );
 }

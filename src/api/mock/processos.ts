@@ -13,6 +13,7 @@ import { criarCliente, criarViatura, validarCliente, validarViatura } from './cl
 import { validarMarcacaoParaRececao } from './agenda';
 import { movimentar, obterPeca, verificarFaltas } from './stock';
 import { avaliarDesconto, exigirCaixaAberta, proximoRecibo } from './financeiro';
+import { notificar, notificarMudanca } from './comunicacoes';
 import { can, PERMISSAO_ETAPA } from '../../auth/permissions';
 import { calcularTotais, faturaPaga, recebidoProcesso, saldoEmAberto, totalFaturavel } from '../../lib/calculos';
 import { ESTADOS_ORDEM, ESTADO_LABEL, estaAtivo } from '../../types';
@@ -96,9 +97,11 @@ function emitirFatura(p: Processo) {
 }
 
 function mudarEstado(p: Processo, u: UtilizadorComSenha, proximo: Processo['estado'], descricao?: string) {
+  const anterior = p.estado;
   p.estado = proximo;
   registarHistorico(p, u.nome, descricao ?? `Processo avançou para "${ESTADO_LABEL[proximo]}"`, 'estado', proximo);
   auditar(u.id, 'mudar_estado', 'processo', p.id, proximo);
+  notificarMudanca(p, anterior, u.id);
 }
 
 /** Regras para sair de cada etapa pelo botão "Avançar". Devolve a mensagem de erro ou null. */
@@ -263,8 +266,10 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       const nome = db().utilizadores.find((x) => x.id === ativo.mecanicoId)?.nome;
       throw new ApiError(422, `${nome} tem o cronómetro a contar neste processo. Peça-lhe para parar antes de reatribuir.`);
     }
+    const mudou = p.mecanicoId !== mec.id;
     p.mecanicoId = mec.id;
     registarHistorico(p, u.nome, `Mecânico atribuído: ${mec.nome}`, 'nota');
+    if (mudou) notificar({ utilizadores: [mec.id] }, 'Viatura atribuída a si', `${p.numero} — ${p.fichaRecepcao.queixaCliente}`, `/processos/${p.id}`, u.id);
     auditar(u.id, 'atribuir_mecanico', 'processo', p.id, mec.nome);
     return guardarEDetalhar(p, u);
   }],
@@ -334,6 +339,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     };
     if (desconto?.estado === 'pendente') {
       registarHistorico(p, u.nome, `Pedido de desconto de ${desconto.percentagem}% enviado à Direção (${desconto.motivo})`, 'nota');
+      notificar({ perfis: ['direcao'] }, 'Desconto para aprovar', `${p.numero} — ${desconto.percentagem}%: ${desconto.motivo}`, `/processos/${p.id}`, u.id);
     }
     auditar(u.id, 'guardar_orcamento', 'processo', p.id, String(calcularTotais(p.orcamento).total));
     return guardarEDetalhar(p, u);
@@ -418,6 +424,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     p.aguardaPecas = aguarda;
     p.notaPecas = nota;
     registarHistorico(p, u.nome, aguarda ? `Reparação parada à espera de peças: ${nota}` : 'Peças recebidas — reparação retomada', 'nota');
+    if (aguarda) notificar({ perfis: ['administrativa'] }, 'Peças em falta', `${p.numero} — ${nota}`, `/processos/${p.id}`, u.id);
     return guardarEDetalhar(p, u);
   }],
 
@@ -461,6 +468,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     };
     p.orcamentosAdicionais = [...(p.orcamentosAdicionais ?? []), adicional];
     registarHistorico(p, u.nome, `Trabalho adicional proposto ao cliente: ${adicional.justificacao}`, 'nota');
+    notificar({ perfis: ['rececionista', 'administrativa'] }, 'Trabalho adicional para aprovar', `${p.numero} — pedir a decisão ao cliente.`, `/processos/${p.id}`, u.id);
     auditar(u.id, 'criar_adicional', 'processo', p.id, String(calcularTotais(adicional).total));
     return guardarEDetalhar(p, u);
   }],
@@ -484,6 +492,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       verificarFaltas(p, u.nome);
     }
     registarHistorico(p, u.nome, `Trabalho adicional ${decisao} pelo cliente`, decisao === 'aprovado' ? 'nota' : 'rejeicao');
+    notificar({ utilizadores: [p.mecanicoId] }, `Trabalho adicional ${decisao}`, `${p.numero} — ${a.justificacao}`, `/processos/${p.id}`, u.id);
     return guardarEDetalhar(p, u);
   }],
 
@@ -519,6 +528,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       p.estado = 'em_reparacao';
       registarHistorico(p, u.nome, `Reprovado no controlo de qualidade (${falhas.map((f: any) => f.item).join(', ')}) — voltou à reparação`, 'rejeicao', 'em_reparacao');
       auditar(u.id, 'reprovar_qualidade', 'processo', p.id);
+      notificarMudanca(p, 'controlo_qualidade', u.id);
     }
     return guardarEDetalhar(p, u);
   }],
@@ -573,6 +583,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     p.estado = 'cancelado';
     registarHistorico(p, u.nome, `Processo cancelado: ${motivo}`, 'cancelamento', 'cancelado');
     auditar(u.id, 'cancelar', 'processo', p.id, motivo);
+    notificarMudanca(p, p.cancelamento.estadoAnterior, u.id);
     return guardarEDetalhar(p, u);
   }],
 ];

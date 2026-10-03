@@ -61,6 +61,12 @@ src/
   Fotos chegam já comprimidas pelo navegador (máx. 1600 px). No modo simulado ficam no IndexedDB.
 - O ciclo do processo (receção → entrega) está todo em [src/api/mock/processos.ts](src/api/mock/processos.ts):
   cada rota documenta as validações e transições que o PHP tem de replicar.
+- Comunicações em [src/api/mock/comunicacoes.ts](src/api/mock/comunicacoes.ts): o **email** é enviado pelo PHP
+  (SMTP da Hostinger, conta da oficina) e fica `enviada` ou `falhou`; o **WhatsApp** começa por links `wa.me`
+  (o operador confirma o envio no seu WhatsApp) e passa mais tarde para a API oficial do WhatsApp Business,
+  com estados entregue/lida por webhook. O destino vem sempre da ficha do cliente e exige consentimento.
+- As notificações internas são consultadas a cada minuto (`GET /notificacoes`): o alojamento partilhado não
+  mantém ligações abertas em tempo real.
 
 ## Deploy (Hostinger)
 
@@ -90,7 +96,7 @@ ficheiros ocultos e de configuração e define cabeçalhos de segurança e de ca
 | F4 | Marcações e capacidade, quadro da oficina por mecânico, "As minhas tarefas" | ✅ |
 | F5 | Stock: reservas, baixas, custo médio, encomendas e fornecedores | ✅ |
 | F6 | Financeiro: recibos, anulações, descontos com aprovação, caixa diária, dívidas, conta corrente | ✅ |
-| F7 | Comunicações (WhatsApp/email) | |
+| F7 | Comunicações: modelos com variáveis, registo de mensagens, clientes por avisar, notificações internas | ✅ |
 | F8 | Portal do cliente | |
 | F9 | Painéis por perfil e relatórios | |
 | F10 | Administração do sistema | |

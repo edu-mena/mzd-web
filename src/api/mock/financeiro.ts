@@ -11,6 +11,7 @@ import { db, guardar } from './db';
 import type { UtilizadorComSenha } from './seed';
 import { auditar, exigir, exigirEstado, novoId, numero, obterProcesso, registarHistorico, texto, umDe } from './contexto';
 import type { Handler } from './contexto';
+import { notificar } from './comunicacoes';
 import { can } from '../../auth/permissions';
 import { saldoEmAberto } from '../../lib/calculos';
 import type { Desconto, DividaCliente, FechoCaixa, FormaPagamento, MovimentoContaCorrente, Pagamento, Processo } from '../../types';
@@ -77,6 +78,7 @@ export const rotasFinanceiro: [Metodo, string, Handler][] = [
     d.motivoDecisao = motivoDecisao;
     registarHistorico(p, u.nome, `Desconto de ${d.percentagem}% ${decisao} pela Direção${d.motivoDecisao ? ` (${d.motivoDecisao})` : ''}`, decisao === 'recusado' ? 'rejeicao' : 'nota');
     auditar(u.id, `desconto_${decisao}`, 'processo', p.id, `${d.percentagem}%`);
+    notificar({ utilizadores: [d.pedidoPorId] }, `Desconto ${decisao}`, `${p.numero} — ${d.percentagem}%${motivoDecisao ? `: ${motivoDecisao}` : ''}`, `/processos/${p.id}`, u.id);
     guardar();
     return { id: p.id };
   }],

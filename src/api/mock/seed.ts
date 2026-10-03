@@ -8,6 +8,10 @@ import type {
   Fornecedor,
   MovimentoStock,
   Marcacao,
+  Mensagem,
+  ModeloMensagem,
+  Perfil,
+  ProcessoDetalhado,
   Tarefa,
   Cliente,
   Configuracao,
@@ -23,8 +27,22 @@ import type {
 } from '../../types';
 import { ESTADOS_ORDEM, ESTADO_LABEL, SISTEMAS_VEICULO, VERIFICACOES_SEGURANCA } from '../../types';
 import { calcularTotais } from '../../lib/calculos';
+import { MODELOS_PADRAO, preencherModelo, valoresDoContexto } from '../../lib/mensagens';
 
-export const VERSAO_DB = 9;
+/** Notificação guardada no servidor; cada utilizador vê-a como lida ou não (ver /notificacoes). */
+export interface NotificacaoInterna {
+  id: string;
+  data: string;
+  titulo: string;
+  texto: string;
+  link?: string;
+  utilizadores: string[];
+  perfis: Perfil[];
+  autorId?: string;
+  lidaPor: string[];
+}
+
+export const VERSAO_DB = 10;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -44,10 +62,14 @@ export interface MockDB {
   fornecedores: Fornecedor[];
   movimentos: MovimentoStock[];
   encomendas: Encomenda[];
+  modelos: ModeloMensagem[];
+  mensagens: Mensagem[];
+  notificacoes: NotificacaoInterna[];
   sequencias: {
     processo: number; fatura: number; peca: number; auditoria: number; pagamento: number;
     cliente: number; viatura: number; tarefa: number; tempo: number; adicional: number; anexo: number; marcacao: number;
     fornecedor: number; movimento: number; encomenda: number; recibo: number; fecho: number;
+    mensagem: number; notificacao: number;
   };
 }
 
@@ -500,6 +522,72 @@ export function criarSeed(): MockDB {
     };
   }
 
+  // ---------- Comunicações: mensagens já enviadas e avisos à equipa ----------
+  // Gerador próprio, para não alterar os restantes dados de demonstração.
+  const rndMsg = seedRandom(7);
+  const modelos = MODELOS_PADRAO.map((m) => ({ ...m }));
+  const mensagens: Mensagem[] = [];
+  const minutos = (iso: string, n: number) => new Date(Math.min(new Date(iso).getTime() + n * 60000, agora - 60000)).toISOString();
+  const MODELO_ETAPA: Partial<Record<EstadoProcesso, Mensagem['modelo']>> = {
+    recepcao: 'rececao', aguarda_aprovacao: 'orcamento', pronta_entrega: 'pronta', entregue: 'entregue',
+  };
+  for (const p of processos) {
+    const c = clientes.find((x) => x.id === p.clienteId)!;
+    if (!c.consentimentoMensagens) continue;
+    const det = { ...p, cliente: c, viatura: viaturas.find((v) => v.id === p.viaturaId)! } as ProcessoDetalhado;
+    for (const h of p.historico) {
+      const chave = h.estado && MODELO_ETAPA[h.estado];
+      if (!chave) continue;
+      // Na etapa atual de um processo em curso, cerca de metade ainda está por avisar.
+      if (h.estado === p.estado && p.estado !== 'entregue' && rndMsg() < 0.5) continue;
+      if (h.estado === 'entregue' && rndMsg() < 0.6) continue;
+      const modelo = modelos.find((m) => m.chave === chave)!;
+      const valores = valoresDoContexto({ nome: c.nome, config: configuracao, processo: { ...det, estado: h.estado! }, comValores: true });
+      const porEmail = !!c.email && chave === 'orcamento' && rndMsg() < 0.5;
+      const data = minutos(h.data, 5 + Math.floor(rndMsg() * 40));
+      mensagens.push({
+        id: `msg${mensagens.length + 1}`, data, canal: porEmail ? 'email' : 'whatsapp', direcao: 'saida',
+        estado: porEmail ? 'enviada' : 'registada', clienteId: c.id, processoId: p.id, nome: c.nome,
+        destino: porEmail ? c.email! : c.telefone, assunto: porEmail ? preencherModelo(modelo.assunto, valores) : undefined,
+        texto: preencherModelo(modelo.texto, valores), modelo: chave, autorId: pick(['u1', 'u5']),
+      });
+      if (chave === 'orcamento' && p.autorizacao?.metodo === 'whatsapp') {
+        mensagens.push({
+          id: `msg${mensagens.length + 1}`, data: minutos(data, 50 + Math.floor(rndMsg() * 120)), canal: 'whatsapp', direcao: 'entrada',
+          estado: 'recebida', clienteId: c.id, processoId: p.id, nome: c.nome, destino: c.telefone,
+          texto: pick(['SIM, podem avançar.', 'Sim. Avancem por favor', 'Sim, obrigado. Quando fica pronto?']), autorId: 'u1',
+        });
+      }
+    }
+  }
+  mensagens.sort((a, b) => a.data.localeCompare(b.data)).forEach((m, i) => { m.id = `msg${i + 1}`; });
+
+  const notificacoes: NotificacaoInterna[] = [];
+  const avisar = (n: Omit<NotificacaoInterna, 'id' | 'lidaPor' | 'utilizadores' | 'perfis'> & Partial<NotificacaoInterna>) =>
+    notificacoes.push({ id: '', utilizadores: [], perfis: [], lidaPor: [], ...n });
+  const ref = (p: Processo) => `${p.numero} · ${viaturas.find((v) => v.id === p.viaturaId)!.matricula}`;
+  for (const p of processos) {
+    const entrou = [...p.historico].reverse().find((h) => h.estado === p.estado)?.data ?? p.criadoEm;
+    const lida = agora - new Date(entrou).getTime() > 86400000;
+    if (p.estado === 'diagnostico' && p.mecanicoId) {
+      avisar({ data: entrou, titulo: 'Viatura atribuída a si', texto: `${p.numero} — ${p.fichaRecepcao.queixaCliente}`, link: `/processos/${p.id}`, utilizadores: [p.mecanicoId], autorId: 'u1', lidaPor: lida ? [p.mecanicoId] : [] });
+    }
+    if (p.estado === 'em_reparacao' && p.mecanicoId) {
+      avisar({ data: entrou, titulo: 'Reparação aprovada pelo cliente', texto: `${ref(p)} — pode começar a reparação.`, link: `/processos/${p.id}`, utilizadores: [p.mecanicoId], perfis: ['chefe_oficina'], autorId: 'u1', lidaPor: lida ? [p.mecanicoId, 'u6'] : [] });
+    }
+    if (p.estado === 'controlo_qualidade') {
+      avisar({ data: entrou, titulo: 'Pronta para controlo de qualidade', texto: `${ref(p)} — reparação concluída.`, link: `/processos/${p.id}`, perfis: ['chefe_oficina'], autorId: p.mecanicoId, lidaPor: lida ? ['u6'] : [] });
+    }
+    if (p.estado === 'pronta_entrega') {
+      avisar({ data: entrou, titulo: 'Viatura pronta', texto: `${ref(p)} — avisar o cliente para levantar.`, link: `/processos/${p.id}`, perfis: ['rececionista', 'administrativa'], autorId: 'u6', lidaPor: lida ? ['u1', 'u5'] : [] });
+    }
+  }
+  if (emOrcamento?.orcamento?.desconto) {
+    const d = emOrcamento.orcamento.desconto;
+    avisar({ data: d.pedidoEm, titulo: 'Desconto para aprovar', texto: `${emOrcamento.numero} — ${d.percentagem}%: ${d.motivo}`, link: `/processos/${emOrcamento.id}`, perfis: ['direcao'], autorId: d.pedidoPorId });
+  }
+  notificacoes.sort((a, b) => b.data.localeCompare(a.data)).forEach((n, i, l) => { n.id = `nt${l.length - i}`; });
+
   // ---------- Stock: inventário inicial e encomendas ----------
   const movimentos: MovimentoStock[] = pecas.map((pc, i) => ({
     id: `mv${i + 1}`, pecaId: pc.id, tipo: 'acerto', quantidade: pc.stock, stockApos: pc.stock,
@@ -535,12 +623,16 @@ export function criarSeed(): MockDB {
     fornecedores,
     movimentos,
     encomendas,
+    modelos,
+    mensagens,
+    notificacoes,
     anexos: [],
     sequencias: {
       processo: 1000 + processos.length, fatura: 2000 + processos.length, peca: pecas.length, auditoria: 0, pagamento: seqPagamento,
       cliente: clientes.length, viatura: viaturas.length, tarefa: seqTarefa, tempo: seqTempo, adicional: 0, anexo: 0, marcacao: marcacoes.length,
       fornecedor: fornecedores.length, movimento: movimentos.length, encomenda: encomendas.length,
       recibo: todosPagamentos.length, fecho: fechos.length,
+      mensagem: mensagens.length, notificacao: notificacoes.length,
     },
   };
 }

@@ -13,7 +13,7 @@ import Matricula from '../../components/ui/Matricula';
 import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
 import { horaCurta } from '../../lib/datas';
-import { linkWhatsApp } from '../../lib/mensagens';
+import ComporMensagem from '../../components/comunicacoes/ComporMensagem';
 
 export default function DetalheMarcacao({ marcacao: m, onFechar, onEditar }: { marcacao: Marcacao; onFechar: () => void; onEditar: () => void }) {
   const { can } = useAuth();
@@ -26,7 +26,7 @@ export default function DetalheMarcacao({ marcacao: m, onFechar, onEditar }: { m
   const passou = new Date(m.data).getTime() < agora;
   const gerir = can('agenda.gerir');
   const quando = new Date(m.data).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
-  const lembrete = `Olá ${m.nome.split(' ')[0]}, lembramos a sua marcação na MZD Carros e Motores ${quando} às ${horaCurta(m.data)}${m.matricula ? ` (viatura ${m.matricula})` : ''}. Pode confirmar respondendo a esta mensagem.`;
+  const [lembrar, setLembrar] = useState(false);
 
   const mudar = (estado: 'agendada' | 'confirmada' | 'faltou' | 'cancelada', msg: string) =>
     alterar.mutate(() => api.marcacoes.mudarEstado(m.id, estado), {
@@ -63,10 +63,8 @@ export default function DetalheMarcacao({ marcacao: m, onFechar, onEditar }: { m
           {m.notas && <div className="col-span-2"><dt className="rotulo">Notas</dt><dd>{m.notas}</dd></div>}
         </dl>
         <div className="flex flex-wrap gap-2">
-          {aberta && (
-            <a href={linkWhatsApp(m.telefone, lembrete)} target="_blank" rel="noopener noreferrer" className={botao('secundario', 'sm')}>
-              <MessageCircle size={14} /> Lembrar por WhatsApp
-            </a>
+          {aberta && can('mensagens.enviar') && (
+            <Button variante="secundario" tamanho="sm" icone={<MessageCircle size={14} />} onClick={() => setLembrar(true)}>Enviar lembrete</Button>
           )}
           {gerir && aberta && <Button variante="secundario" tamanho="sm" icone={<CalendarClock size={14} />} onClick={onEditar}>Alterar dia ou hora</Button>}
           {gerir && (m.estado === 'cancelada' || m.estado === 'faltou') && !passou && (
@@ -75,6 +73,7 @@ export default function DetalheMarcacao({ marcacao: m, onFechar, onEditar }: { m
           {m.processoId && <Link to={`/processos/${m.processoId}`} className={botao('secundario', 'sm')}>Abrir processo</Link>}
         </div>
       </div>
+      {lembrar && <ComporMensagem alvo={{ marcacaoId: m.id }} modeloInicial="marcacao" onFechar={() => setLembrar(false)} />}
     </Modal>
   );
 }

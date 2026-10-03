@@ -5,6 +5,7 @@ import { API_MODE } from '../../api/client';
 import { PERFIL_LABEL } from '../../types';
 import { useAuth } from '../../auth/useAuth';
 import PaletaComandos from './PaletaComandos';
+import CentroNotificacoes from './CentroNotificacoes';
 
 const ehMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -60,6 +61,8 @@ export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             Demonstração
           </span>
         )}
+
+        <CentroNotificacoes />
 
         <div className="relative">
           <button

@@ -1,20 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { useDividas } from '../../api/hooks';
 import { Card } from '../../components/ui/Card';
 import StatTile from '../../components/ui/StatTile';
 import Kz from '../../components/ui/Kz';
-import { botao } from '../../components/ui/botao';
+import Button from '../../components/ui/Button';
+import ComporMensagem from '../../components/comunicacoes/ComporMensagem';
+import { useAuth } from '../../auth/useAuth';
+import type { DividaCliente } from '../../types';
 import { Table, Th, Tr, Td } from '../../components/ui/Table';
 import { Carregando, Vazio } from '../../components/ui/Estados';
 import { formatAOA } from '../../lib/format';
-import { linkWhatsApp } from '../../lib/mensagens';
 
 const ESCALOES = ['Até 30 dias', '31–60 dias', '61–90 dias', 'Mais de 90 dias'];
 
 /** Dívidas de clientes por antiguidade, com lembrete de pagamento por WhatsApp. */
 export default function Dividas() {
+  const { can } = useAuth();
   const { data: dividas, isPending } = useDividas();
+  const [lembrar, setLembrar] = useState<DividaCliente | null>(null);
   if (isPending || !dividas) return <Carregando />;
   const total = dividas.reduce((s, d) => s + d.total, 0);
   const porEscalao = [0, 1, 2, 3].map((i) => dividas.reduce((s, d) => s + d.escaloes[i], 0));
@@ -43,7 +48,6 @@ export default function Dividas() {
           <tbody>
             {dividas.map((d) => {
               const maisAntiga = Math.max(...d.faturas.map((f) => f.dias));
-              const mensagem = `Olá ${d.cliente.nome.split(' ')[0]}, lembramos que tem ${formatAOA(d.total)} por liquidar na MZD Carros e Motores (${d.faturas.map((f) => f.numero).join(', ')}). Pode pagar por transferência, TPA ou Multicaixa. Obrigado.`;
               return (
                 <Tr key={d.cliente.id}>
                   <Td><Link to={`/clientes/${d.cliente.id}`} className="font-semibold text-mzd-black underline-offset-4 hover:underline">{d.cliente.nome}</Link></Td>
@@ -57,10 +61,10 @@ export default function Dividas() {
                   ))}
                   <Td direita><Kz valor={d.total} className="font-semibold" /></Td>
                   <Td direita>
-                    {d.cliente.consentimentoMensagens ? (
-                      <a href={linkWhatsApp(d.cliente.telefone, mensagem)} target="_blank" rel="noopener noreferrer" className={botao('secundario', 'sm')} title={`Mais antiga: ${maisAntiga} dias`}>
-                        <MessageCircle size={13} /> Lembrar
-                      </a>
+                    {!can('mensagens.enviar') ? null : d.cliente.consentimentoMensagens ? (
+                      <Button variante="secundario" tamanho="sm" icone={<MessageCircle size={13} />} title={`Mais antiga: ${maisAntiga} dias`} onClick={() => setLembrar(d)}>
+                        Lembrar
+                      </Button>
                     ) : (
                       <span className="text-[11px] text-mzd-gray">Sem consentimento</span>
                     )}
@@ -71,6 +75,13 @@ export default function Dividas() {
           </tbody>
         </Table>
       </Card>
+      {lembrar && (
+        <ComporMensagem
+          alvo={{ clienteId: lembrar.cliente.id, divida: { total: lembrar.total, faturas: lembrar.faturas.map((f) => f.numero) } }}
+          modeloInicial="divida"
+          onFechar={() => setLembrar(null)}
+        />
+      )}
     </div>
   );
 }

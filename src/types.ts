@@ -503,17 +503,6 @@ export interface Anexo {
 
 export type FinalidadeAnexo = 'assinatura_recepcao' | 'assinatura_aprovacao' | 'comprovativo_aprovacao' | 'assinatura_entrega';
 
-export interface Mensagem {
-  id: string;
-  processoId?: string;
-  clienteId: string;
-  canal: 'whatsapp' | 'email';
-  texto: string;
-  estado: 'pendente' | 'enviada' | 'entregue' | 'lida' | 'falhada';
-  criadoEm: string;
-  autorId?: string;
-}
-
 export interface EventoAuditoria {
   id: string;
   data: string;
@@ -601,4 +590,89 @@ export interface ClienteResumo extends Cliente {
 export interface ViaturaResumo extends Viatura {
   cliente: Pick<Cliente, 'id' | 'nome' | 'telefone'>;
   nServicos: number;
+}
+
+// ---------- Comunicações ----------
+
+export type CanalMensagem = 'whatsapp' | 'email';
+export const CANAL_LABEL: Record<CanalMensagem, string> = { whatsapp: 'WhatsApp', email: 'Email' };
+
+/**
+ * - registada: aberta no WhatsApp do operador (fase A, links wa.me) — o envio final é feito por ele;
+ * - enviada/entregue/lida: confirmadas pelo servidor de email ou pela API do WhatsApp (fase B);
+ * - falhou: o servidor não conseguiu enviar; recebida: resposta do cliente registada à mão.
+ */
+export type EstadoMensagem = 'registada' | 'enviada' | 'entregue' | 'lida' | 'falhou' | 'recebida';
+export const ESTADO_MENSAGEM_LABEL: Record<EstadoMensagem, string> = {
+  registada: 'Aberta no WhatsApp',
+  enviada: 'Enviada',
+  entregue: 'Entregue',
+  lida: 'Lida',
+  falhou: 'Falhou',
+  recebida: 'Resposta do cliente',
+};
+
+export type ChaveModelo =
+  | 'rececao' | 'diagnostico' | 'orcamento' | 'adicional' | 'reparacao' | 'pronta' | 'entregue'
+  | 'marcacao' | 'divida' | 'livre';
+
+export interface ModeloMensagem {
+  chave: ChaveModelo;
+  nome: string;
+  /** Quando é usado (texto de ajuda para quem edita). */
+  descricao: string;
+  /** Assunto do email (o WhatsApp não usa). */
+  assunto: string;
+  texto: string;
+  atualizadoEm?: string;
+  atualizadoPorId?: string;
+}
+
+export interface Mensagem {
+  id: string;
+  data: string;
+  canal: CanalMensagem;
+  direcao: 'saida' | 'entrada';
+  estado: EstadoMensagem;
+  clienteId?: string;
+  processoId?: string;
+  marcacaoId?: string;
+  /** Nome de quem recebe/envia (pode ainda não ser cliente, ex.: marcações). */
+  nome: string;
+  /** Telefone (WhatsApp) ou endereço de email. */
+  destino: string;
+  assunto?: string;
+  texto: string;
+  modelo?: ChaveModelo;
+  autorId: string;
+  erro?: string;
+}
+
+/** Cliente por avisar: um momento-chave sem mensagem enviada desde então. */
+export interface ComunicacaoPendente {
+  id: string;
+  motivo: 'rececao' | 'orcamento' | 'adicional' | 'pronta' | 'marcacao' | 'divida';
+  modelo: ChaveModelo;
+  titulo: string;
+  desde: string;
+  clienteId?: string;
+  processoId?: string;
+  marcacaoId?: string;
+  nome: string;
+  telefone: string;
+  email?: string;
+  consentimento: boolean;
+  matricula?: string;
+  /** Só nos lembretes de pagamento (e só para quem vê valores). */
+  divida?: { total: number; faturas: string[] };
+}
+
+/** Aviso interno para a equipa (centro de notificações). */
+export interface Notificacao {
+  id: string;
+  data: string;
+  titulo: string;
+  texto: string;
+  link?: string;
+  lida: boolean;
 }
