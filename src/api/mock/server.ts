@@ -13,6 +13,7 @@ import { rotasStock } from './stock';
 import { rotasFinanceiro } from './financeiro';
 import { rotasComunicacoes } from './comunicacoes';
 import { rotasPortal } from './portal';
+import { rotasRelatorios } from './relatorios';
 import { guardarFicheiro, limparFicheiros, PREFIXO_URL_MOCK } from './ficheiros';
 import { estaAtivo } from '../../types';
 import type { Anexo, Configuracao, FinalidadeAnexo } from '../../types';
@@ -67,6 +68,7 @@ const rotas: [Metodo, string, Handler][] = [
   ...rotasFinanceiro,
   ...rotasComunicacoes,
   ...rotasPortal,
+  ...rotasRelatorios,
 
   // Configuração
   ['GET', '/configuracao', () => {

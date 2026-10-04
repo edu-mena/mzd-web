@@ -5,6 +5,8 @@ import { enviarFicheiro, request } from './client';
 import type {
   Anexo,
   AcessoPortal,
+  AlertaPainel,
+  Relatorio,
   PortalProcesso,
   CanalMensagem,
   ChaveModelo,
@@ -279,6 +281,11 @@ export const api = {
       request<PortalProcesso>('POST', `/portal/${encodeURIComponent(token)}/adicionais/${adicionalId}`, dados),
     /** Equipa: gera um link novo; o anterior deixa de funcionar. */
     renovar: (processoId: string) => request<AcessoPortal>('POST', `/processos/${processoId}/portal/renovar`),
+  },
+  relatorios: {
+    /** `de` e `ate` em "AAAA-MM-DD" (dias locais, inclusive). */
+    obter: (de: string, ate: string) => request<Relatorio>('GET', `/relatorios${qs({ de, ate })}`),
+    alertas: () => request<AlertaPainel[]>('GET', '/painel/alertas'),
   },
   notificacoes: {
     listar: () => request<Notificacao[]>('GET', '/notificacoes'),

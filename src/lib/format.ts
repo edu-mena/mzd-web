@@ -17,3 +17,8 @@ export function diasEntre(a: string, b: string = new Date().toISOString()): numb
 export function iniciais(nome: string): string {
   return nome.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 }
+
+export type FormatoIndicador = 'kz' | 'n' | 'pct' | 'dias';
+
+export const formatarIndicador = (v: number, f: FormatoIndicador) =>
+  f === 'kz' ? formatAOA(v) : f === 'pct' ? `${v.toLocaleString('pt-PT')}%` : f === 'dias' ? `${v.toLocaleString('pt-PT')} dias` : v.toLocaleString('pt-PT');

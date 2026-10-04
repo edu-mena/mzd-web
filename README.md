@@ -69,12 +69,14 @@ src/
   token (aleatório, `random_bytes`) é a credencial. O PHP deve limitar pedidos por IP nessas rotas, guardar IP e
   user agent nas aprovações e nunca devolver mais do que a projeção `PortalProcesso`. O link expira 30 dias
   depois da entrega. No modo de demonstração o portal só funciona no mesmo navegador (os dados são locais).
+- Relatórios e alertas em [src/api/mock/relatorios.ts](src/api/mock/relatorios.ts): `GET /relatorios?de&ate` devolve
+  agregados (no PHP, consultas SQL com GROUP BY) e `GET /painel/alertas` os alertas já filtrados pelas permissões.
 - As notificações internas são consultadas a cada minuto (`GET /notificacoes`): o alojamento partilhado não
   mantém ligações abertas em tempo real.
 
 ## Deploy (Hostinger)
 
-O site está em **mzd.it.ao**. A Hostinger está ligada ao ramo **`main`** e **compila o projecto ela própria**
+O site está em **https://mzd.it.ao**. A Hostinger está ligada ao ramo **`main`** e **compila o projecto ela própria**
 (`npm install` + `npm run build`, Node 22) e publica a pasta `dist/`. Por isso:
 
 - O `main` contém o **código-fonte**. Cada push para o `main` atualiza o site.
@@ -87,7 +89,7 @@ Enquanto não houver backend, o site publicado corre em modo de demonstração. 
 variável de ambiente `VITE_API_MODE=http` na configuração de build da Hostinger.
 
 O [public/.htaccess](public/.htaccess) encaminha as rotas da aplicação, deixa `/api` para o PHP, bloqueia
-ficheiros ocultos e de configuração e define cabeçalhos de segurança e de cache. Ative também *Forçar HTTPS* no hPanel.
+ficheiros ocultos e de configuração e define cabeçalhos de segurança (incluindo HSTS) e de cache. O HTTPS está ativo e forçado no hPanel.
 
 ## Plano
 
@@ -102,6 +104,6 @@ ficheiros ocultos e de configuração e define cabeçalhos de segurança e de ca
 | F6 | Financeiro: recibos, anulações, descontos com aprovação, caixa diária, dívidas, conta corrente | ✅ |
 | F7 | Comunicações: modelos com variáveis, registo de mensagens, clientes por avisar, notificações internas | ✅ |
 | F8 | Portal do cliente: link pessoal, percurso, orçamento e aprovação online, levantamento | ✅ |
-| F9 | Painéis por perfil e relatórios | |
+| F9 | Painéis por função, alertas "pede atenção", relatórios por período com comparação e CSV | ✅ |
 | F10 | Administração do sistema | |
 | F11 | Acessibilidade, testes e acabamento | |

@@ -139,7 +139,7 @@ export function useEnviarAnexo(processoId: string) {
   });
 }
 
-export const useCaixa = (dia: string) => useQuery({ queryKey: ['financeiro', 'caixa', dia], queryFn: () => api.financeiro.caixa(dia) });
+export const useCaixa = (dia: string, opcoes: Opcoes = {}) => useQuery({ queryKey: ['financeiro', 'caixa', dia], queryFn: () => api.financeiro.caixa(dia), ...opcoes });
 export const useFechos = () => useQuery({ queryKey: ['financeiro', 'fechos'], queryFn: api.financeiro.fechos });
 export const useDividas = () => useQuery({ queryKey: ['financeiro', 'dividas'], queryFn: api.financeiro.dividas });
 export const useContaCorrente = (clienteId: string, opcoes: Opcoes = {}) =>
@@ -250,3 +250,11 @@ export function useRenovarPortal(processoId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: chaves.processo(processoId) }),
   });
 }
+
+// ---------- Relatórios e painel ----------
+
+export const useRelatorio = (de: string, ate: string) =>
+  useQuery({ queryKey: ['relatorios', de, ate], queryFn: () => api.relatorios.obter(de, ate), placeholderData: (anterior) => anterior });
+
+/** Alertas do painel; refrescam com qualquer alteração (ver refrescarComunicacoes) e a cada 2 minutos. */
+export const useAlertas = () => useQuery({ queryKey: ['comunicacoes', 'alertas'], queryFn: api.relatorios.alertas, refetchInterval: 2 * 60_000 });

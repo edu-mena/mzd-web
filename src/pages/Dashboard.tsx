@@ -20,6 +20,8 @@ import { calcularTotais, saldoEmAberto } from '../lib/calculos';
 import { TOM_ESTADO } from '../lib/estados';
 import { COR, eixo, milhares, tooltip } from '../lib/graficos';
 import PainelMecanico from './painel/PainelMecanico';
+import PainelBalcao from './painel/PainelBalcao';
+import Alertas from './painel/Alertas';
 
 /** Data em que o processo foi entregue (evento de mudança para "Entregue"). */
 function dataEntrega(p: ProcessoDetalhado): string | undefined {
@@ -28,10 +30,15 @@ function dataEntrega(p: ProcessoDetalhado): string | undefined {
 
 const atrasado = (p: ProcessoDetalhado) => estaAtivo(p.estado) && diasEntre(p.prazoEntrega) > 0;
 
-/** O mecânico vê a sua lista de trabalho; os restantes perfis veem o painel de gestão. */
+/**
+ * Um painel por função: o mecânico vê a sua lista de trabalho; a receção e a administração o dia de hoje;
+ * a chefia e a Direção a gestão da oficina.
+ */
 export default function Dashboard() {
   const { user } = useAuth();
-  return user?.perfil === 'mecanico' ? <PainelMecanico /> : <PainelGestao />;
+  if (user?.perfil === 'mecanico') return <PainelMecanico />;
+  if (user?.perfil === 'rececionista' || user?.perfil === 'administrativa') return <PainelBalcao />;
+  return <PainelGestao />;
 }
 
 function PainelGestao() {
@@ -176,6 +183,8 @@ function PainelGestao() {
           </div>
         </Card>
 
+        <div className="space-y-4">
+          <Alertas />
         <Card>
           <CardHeader
             title="Prazos ultrapassados"
@@ -201,6 +210,7 @@ function PainelGestao() {
             </ul>
           )}
         </Card>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

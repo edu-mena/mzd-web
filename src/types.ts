@@ -743,3 +743,69 @@ export interface PortalProcesso {
   canceladoEm?: string;
   fotos: Anexo[];
 }
+
+// ---------- Relatórios e painéis ----------
+
+/**
+ * Valor no período escolhido e no período anterior de igual duração.
+ * null = sem base de cálculo (ex.: taxa de cumprimento sem nenhuma entrega), diferente de zero.
+ */
+export interface Comparacao { atual: number | null; anterior: number | null }
+
+export interface Relatorio {
+  periodo: { de: string; ate: string; anteriorDe: string; anteriorAte: string };
+  /** Só para quem pode ver valores. */
+  negocio?: {
+    faturado: Comparacao;
+    recebido: Comparacao;
+    ticketMedio: Comparacao;
+    pecas: number;
+    maoObra: number;
+    descontos: number;
+    /** Só para quem gere o stock (custos). Custo ao preço médio atual. */
+    margemPecas?: { venda: number; custo: number };
+    /** 12 meses até ao fim do período ("AAAA-MM"). */
+    porMes: { mes: string; faturado: number; recebido: number }[];
+  };
+  operacao: {
+    entradas: Comparacao;
+    entregas: Comparacao;
+    cumprimentoPrazo: Comparacao;
+    cicloMedioDias: Comparacao;
+    retrabalhoPct: Comparacao;
+    aprovacaoPct: Comparacao;
+    /** Mediana, em horas, entre o envio do orçamento e a decisão do cliente. */
+    respostaClienteHoras: number | null;
+    tempoPorEtapa: { estado: EstadoProcesso; mediaHoras: number; n: number }[];
+    motivosRecusa: { motivo: string; total: number }[];
+  };
+  equipa: {
+    mecanicoId: string;
+    nome: string;
+    concluidos: number;
+    horasTrabalhadas: number;
+    /** Horas de mão de obra vendidas nos processos entregues. */
+    horasFaturadas: number;
+    retrabalhos: number;
+    maoObraFaturada?: number;
+  }[];
+  clientes: {
+    novos: Comparacao;
+    recorrentesPct: number;
+    top: { clienteId: string; nome: string; processos: number; faturado?: number }[];
+    sistemas: { sistema: string; total: number }[];
+    pecasTop: { descricao: string; quantidade: number; valor?: number }[];
+  };
+}
+
+export type GravidadeAlerta = 'critico' | 'aviso' | 'info';
+
+/** Algo que pede atenção ou decisão, já filtrado pelas permissões de quem vê. */
+export interface AlertaPainel {
+  id: string;
+  gravidade: GravidadeAlerta;
+  titulo: string;
+  texto: string;
+  link: string;
+  total: number;
+}
