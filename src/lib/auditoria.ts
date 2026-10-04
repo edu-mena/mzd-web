@@ -11,13 +11,13 @@ const ACAO: Record<string, string> = {
   portal_aprovado: 'Cliente aprovou no portal', portal_recusado: 'Cliente recusou no portal', renovar_link_portal: 'Gerou novo link do portal',
   fechar_caixa: 'Fechou a caixa', reabrir_caixa: 'Reabriu a caixa', fundir: 'Juntou clientes', transferir: 'Transferiu viatura',
   acerto_stock: 'Acertou stock', enviar: 'Enviou', receber: 'Recebeu', estado_marcacao: 'Mudou estado da marcação',
-  enviar_mensagem: 'Enviou mensagem', registar_resposta: 'Registou resposta do cliente', descarregar: 'Descarregou',
+  enviar_mensagem: 'Enviou mensagem', pedido_site: 'Pedido de serviço no site', tratar: 'Tratou', enviar_imagem: 'Enviou imagem', registar_horas: 'Registou horas', registar_resposta: 'Registou resposta do cliente', descarregar: 'Descarregou',
 };
 
 export const ENTIDADE_LABEL: Record<string, string> = {
   sessao: 'Sessão', processo: 'Processo', cliente: 'Cliente', viatura: 'Viatura', utilizador: 'Utilizador',
   configuracao: 'Definições', peca: 'Peça', fornecedor: 'Fornecedor', encomenda: 'Encomenda', marcacao: 'Marcação',
-  caixa: 'Caixa', mensagem: 'Mensagem', modelo_mensagem: 'Modelo de mensagem', copia_seguranca: 'Cópia de segurança',
+  caixa: 'Caixa', site: 'Site', pedido: 'Pedido do site', mensagem: 'Mensagem', modelo_mensagem: 'Modelo de mensagem', copia_seguranca: 'Cópia de segurança',
 };
 
 export const acaoLegivel = (acao: string) => ACAO[acao] ?? acao.replace(/_/g, ' ');

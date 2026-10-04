@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
@@ -5,11 +6,17 @@ import { useAuth } from './useAuth';
 import type { Permissao } from './permissions';
 import { EcraCarregamento } from '../components/ui/Estados';
 
-/** Só deixa passar utilizadores com sessão iniciada; os restantes vão para /login. */
+const Site = lazy(() => import('../pages/Site'));
+
+/**
+ * Só deixa passar utilizadores com sessão iniciada. Sem sessão, a página inicial é o site público
+ * e as restantes levam ao login (voltando depois à página pedida).
+ */
 export function RequireAuth() {
   const { user, carregando } = useAuth();
   const location = useLocation();
   if (carregando) return <EcraCarregamento />;
+  if (!user && location.pathname === '/') return <Site />;
   if (!user) return <Navigate to="/login" replace state={{ de: location.pathname + location.search }} />;
   // Palavra-passe temporária: nada mais funciona até ser trocada (o servidor também o garante).
   if (user.mudarSenha && location.pathname !== '/alterar-senha') return <Navigate to="/alterar-senha" replace />;

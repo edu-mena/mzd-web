@@ -5,6 +5,10 @@ import { enviarFicheiro, request } from './client';
 import type {
   Anexo,
   AcessoPortal,
+  ConteudoSite,
+  EstadoPedido,
+  ImagemSite,
+  PedidoServico,
   CopiaSeguranca,
   EstadoSistema,
   PaginaAuditoria,
@@ -68,6 +72,13 @@ export interface DecisaoPortal {
 export interface DadosUtilizador { nome: string; email: string; telefone?: string; perfil: Perfil; semAcesso?: boolean }
 
 export interface FiltrosAuditoria { de?: string; ate?: string; utilizadorId?: string; entidade?: string; q?: string; pagina?: number; tamanho?: number }
+
+export interface NovoPedido {
+  nome: string; telefone: string; email?: string; modelo?: string; matricula?: string; servico: string;
+  dataPreferida?: string; mensagem?: string; consentimento: boolean;
+  /** Campo-armadilha: tem de ir vazio (os robôs preenchem-no). */
+  site?: string;
+}
 
 export interface NovaMensagem {
   canal: CanalMensagem;
@@ -302,6 +313,20 @@ export const api = {
     /** `de` e `ate` em "AAAA-MM-DD" (dias locais, inclusive). */
     obter: (de: string, ate: string) => request<Relatorio>('GET', `/relatorios${qs({ de, ate })}`),
     alertas: () => request<AlertaPainel[]>('GET', '/painel/alertas'),
+  },
+  /** Site público: GET e pedidos são públicos; editar exige "site.gerir". */
+  site: {
+    obter: () => request<ConteudoSite>('GET', '/site'),
+    guardar: (dados: ConteudoSite) => request<ConteudoSite>('PUT', '/site', dados),
+    enviarImagem: (ficheiro: Blob, alt: string) => {
+      const form = new FormData();
+      form.append('ficheiro', ficheiro, ficheiro instanceof File ? ficheiro.name : 'imagem.jpg');
+      form.append('alt', alt);
+      return enviarFicheiro<ImagemSite>('/site/imagens', form);
+    },
+    pedir: (dados: NovoPedido) => request<{ recebido: true }>('POST', '/site/pedidos', dados),
+    pedidos: () => request<PedidoServico[]>('GET', '/site/pedidos'),
+    tratarPedido: (id: string, dados: { estado?: EstadoPedido; notas?: string; marcacaoId?: string }) => request<PedidoServico>('PATCH', `/site/pedidos/${id}`, dados),
   },
   notificacoes: {
     listar: () => request<Notificacao[]>('GET', '/notificacoes'),

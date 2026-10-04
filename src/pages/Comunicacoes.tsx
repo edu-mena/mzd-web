@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMensagens, usePendentesComunicacao } from '../api/hooks';
+import { useMensagens, usePedidosSite, usePendentesComunicacao } from '../api/hooks';
 import PageHeader from '../components/ui/PageHeader';
 import StatTile from '../components/ui/StatTile';
 import Tabs from '../components/ui/Tabs';
@@ -8,10 +8,12 @@ import { diaISO } from '../lib/datas';
 import PorAvisar from './comunicacoes/PorAvisar';
 import Historico from './comunicacoes/Historico';
 import Modelos from './comunicacoes/Modelos';
+import PedidosSite from './comunicacoes/PedidosSite';
 
 export default function Comunicacoes() {
   const { data: pendentes, isPending } = usePendentesComunicacao();
   const { data: mensagens = [], isPending: aCarregarMensagens } = useMensagens();
+  const { data: pedidos = [] } = usePedidosSite();
   const n = (v: number) => (aCarregarMensagens ? '—' : String(v));
   const [agora] = useState(() => Date.now());
 
@@ -32,6 +34,7 @@ export default function Comunicacoes() {
       <Tabs
         tabs={[
           { id: 'avisar', label: 'Por avisar', badge: pendentes?.length, content: isPending || !pendentes ? <Carregando /> : <PorAvisar pendentes={pendentes} /> },
+          { id: 'pedidos', label: 'Pedidos do site', badge: pedidos.filter((p) => p.estado === 'novo').length, content: <PedidosSite /> },
           { id: 'historico', label: 'Histórico', content: <Historico mensagens={mensagens} /> },
           { id: 'modelos', label: 'Modelos', content: <Modelos /> },
         ]}

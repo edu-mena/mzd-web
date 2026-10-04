@@ -146,3 +146,25 @@
   body { background: white; }
   .pagina > * { animation: none; }
 }
+
+/* ---------- Site público ---------- */
+/* Revelação ao rolar só com CSS (sem JS): onde não houver suporte, o conteúdo aparece logo. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .revelar {
+      animation: revelar linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
+  .zoom-lento { animation: zoom-lento 14s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+}
+@keyframes revelar {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes zoom-lento {
+  from { transform: scale(1.1); }
+  to { transform: scale(1); }
+}
+html:has(.site-publico) { scroll-behavior: smooth; }

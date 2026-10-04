@@ -255,6 +255,10 @@ function alertas(u: UtilizadorComSenha): AlertaPainel[] {
     const antigas = base.processos.filter((p) => p.fatura && saldoEmAberto(p.fatura) > 0 && new Date(p.fatura.data).getTime() < limite);
     add(true, { id: 'dividas', gravidade: 'aviso', titulo: plural(antigas.length, 'fatura por pagar há mais de 60 dias', 'faturas por pagar há mais de 60 dias'), texto: 'Veja as dívidas por antiguidade.', link: '/faturacao', total: antigas.length });
   }
+  if (can(u, 'mensagens.enviar')) {
+    const n = base.pedidos.filter((p) => p.estado === 'novo').length;
+    add(true, { id: 'pedidos-site', gravidade: 'aviso', titulo: plural(n, 'pedido do site por responder', 'pedidos do site por responder'), texto: 'Ligue ao cliente e marque, se for o caso.', link: '/comunicacoes', total: n });
+  }
   if (can(u, 'agenda.gerir')) {
     const n = base.marcacoes.filter((m) => m.estado === 'agendada' && diaLocal(m.data) === hoje).length;
     add(true, { id: 'marcacoes', gravidade: 'info', titulo: plural(n, 'marcação de hoje por confirmar', 'marcações de hoje por confirmar'), texto: 'Ligue ou envie um lembrete.', link: '/agenda', total: n });

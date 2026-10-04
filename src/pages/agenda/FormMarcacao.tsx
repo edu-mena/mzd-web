@@ -20,20 +20,27 @@ import { diaISO, horaCurta, horariosDoDia } from '../../lib/datas';
 const normalizar = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 /** Nova marcação (ou edição). Com `diaInicial` abre já no dia escolhido na agenda. */
-export default function FormMarcacao({ marcacao, diaInicial, onFechar }: { marcacao?: Marcacao; diaInicial?: string; onFechar: () => void }) {
+export default function FormMarcacao({ marcacao, diaInicial, onFechar, inicial, onCriada }: {
+  marcacao?: Marcacao;
+  diaInicial?: string;
+  onFechar: () => void;
+  /** Dados de partida para uma marcação nova (ex.: vindos de um pedido do site). */
+  inicial?: { nome: string; telefone: string; matricula?: string; notas?: string };
+  onCriada?: (m: Marcacao) => void;
+}) {
   const toast = useToast();
   const alterar = useAlterarMarcacao<Marcacao>();
   const { data: config } = useConfiguracao();
   const { data: viaturas = [] } = useViaturas();
-  const [modo, setModo] = useState<'viatura' | 'contacto'>(marcacao && !marcacao.viaturaId ? 'contacto' : 'viatura');
+  const [modo, setModo] = useState<'viatura' | 'contacto'>((marcacao && !marcacao.viaturaId) || inicial ? 'contacto' : 'viatura');
   // undefined = ainda não mexeu (usa a da marcação); null = trocou e ainda não escolheu outra.
   const [viatura, setViatura] = useState<ViaturaResumo | null | undefined>();
   const [q, setQ] = useState('');
-  const [contacto, setContacto] = useState({ nome: marcacao?.nome ?? '', telefone: marcacao?.telefone ?? '+244 ', matricula: marcacao?.matricula ?? '' });
+  const [contacto, setContacto] = useState({ nome: marcacao?.nome ?? inicial?.nome ?? '', telefone: marcacao?.telefone ?? inicial?.telefone ?? '+244 ', matricula: marcacao?.matricula ?? inicial?.matricula ?? '' });
   const [dia, setDia] = useState(marcacao ? diaISO(marcacao.data) : diaInicial ?? diaISO(new Date()));
   const [hora, setHora] = useState(marcacao ? horaCurta(marcacao.data) : '08:00');
   const [tipo, setTipo] = useState<TipoMarcacao | undefined>(marcacao?.tipo);
-  const [notas, setNotas] = useState(marcacao?.notas ?? '');
+  const [notas, setNotas] = useState(marcacao?.notas ?? inicial?.notas ?? '');
   const [cheio, setCheio] = useState<string | null>(null);
 
   const viaturaAtual = viatura === undefined ? (marcacao?.viaturaId ? viaturas.find((v) => v.id === marcacao.viaturaId) : undefined) : viatura ?? undefined;
@@ -59,6 +66,7 @@ export default function FormMarcacao({ marcacao, diaInicial, onFechar }: { marca
     };
     alterar.mutate(() => (marcacao ? api.marcacoes.editar(marcacao.id, dados) : api.marcacoes.criar(dados)), {
       onSuccess: (m) => {
+        if (!marcacao) onCriada?.(m);
         toast(marcacao ? 'Marcação alterada' : `Marcado: ${m.nome}, ${new Date(m.data).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })} às ${horaCurta(m.data)}`);
         onFechar();
       },

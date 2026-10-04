@@ -11,6 +11,15 @@ export default function AppLayout() {
   const principal = useRef<HTMLElement>(null);
   const paginaAnterior = useRef(pathname);
 
+  // A área reservada não deve aparecer nos motores de pesquisa (o site público sim).
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
+
   // Ao mudar de página: volta ao topo e o foco passa para o conteúdo (leitores de ecrã e teclado).
   // Compara com a página anterior (e não "primeira vez"), para resistir aos efeitos duplos do modo estrito.
   useEffect(() => {

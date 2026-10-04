@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { API_MODE } from '../api/client';
 import { mensagemErro } from '../lib/erros';
@@ -38,7 +38,14 @@ export default function Login() {
   const destino = (location.state as { de?: string } | null)?.de ?? '/';
   const [erro, setErro] = useState<string | null>(null);
   const [verSenha, setVerSenha] = useState(false);
-  useEffect(() => { document.title = 'Entrar · MZD Carros e Motores'; }, []);
+  useEffect(() => {
+    document.title = 'Entrar · MZD Carros e Motores';
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, []);
 
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<Dados>({
     resolver: zodResolver(esquema),
@@ -85,6 +92,9 @@ export default function Login() {
 
       <main className="flex items-center justify-center px-4 py-10 sm:px-10">
         <div className="w-full max-w-sm">
+          <Link to="/" className="mb-8 inline-flex items-center gap-1.5 text-xs font-semibold text-mzd-gray hover:text-mzd-black">
+            <ArrowLeft size={14} /> Voltar ao site
+          </Link>
           <img src={logoMzd} alt="Grupo MZD" className="mb-10 h-9 w-auto lg:hidden" />
           <h1 className="text-2xl font-extrabold text-mzd-black">Iniciar sessão</h1>
           <p className="mt-1 text-sm text-mzd-gray">Use o email e a palavra-passe atribuídos pela oficina.</p>

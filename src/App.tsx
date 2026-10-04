@@ -32,6 +32,8 @@ const NaoEncontrada = lazy(() => import('./pages/NaoEncontrada'));
 const PortalCliente = lazy(() => import('./pages/PortalCliente'));
 const Administracao = lazy(() => import('./pages/Administracao'));
 const AlterarSenha = lazy(() => import('./pages/AlterarSenha'));
+const Site = lazy(() => import('./pages/Site'));
+const GestaoSite = lazy(() => import('./pages/GestaoSite'));
 
 const protegida = (permissao: Permissao, pagina: ReactNode) => (
   <RequirePermission permissao={permissao}>{pagina}</RequirePermission>
@@ -46,6 +48,8 @@ export default function App() {
           <Suspense fallback={<EcraCarregamento />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Site público: também em "/" para quem não tem sessão (ver RequireAuth). */}
+            <Route path="/site" element={<Site />} />
             {/* Portal do cliente: público, o token do link é a credencial. */}
             <Route path="/p/:token" element={<PortalCliente />} />
             <Route element={<RequireAuth />}>
@@ -68,6 +72,7 @@ export default function App() {
                 <Route path="/equipa" element={protegida('equipa.ver', <Equipa />)} />
                 <Route path="/definicoes" element={protegida('definicoes.gerir', <Definicoes />)} />
                 <Route path="/administracao" element={protegida('auditoria.ver', <Administracao />)} />
+                <Route path="/gestao-site" element={protegida('site.gerir', <GestaoSite />)} />
                 <Route path="/ajuda" element={<Ajuda />} />
                 <Route path="*" element={<NaoEncontrada />} />
               </Route>

@@ -15,6 +15,7 @@ import { rotasComunicacoes } from './comunicacoes';
 import { rotasPortal } from './portal';
 import { rotasRelatorios } from './relatorios';
 import { rotasAdministracao } from './administracao';
+import { rotasSite } from './site';
 import { guardarFicheiro, limparFicheiros, PREFIXO_URL_MOCK } from './ficheiros';
 import { estaAtivo } from '../../types';
 import type { Anexo, Configuracao, FinalidadeAnexo } from '../../types';
@@ -72,6 +73,7 @@ const rotas: [Metodo, string, Handler][] = [
   ...rotasPortal,
   ...rotasRelatorios,
   ...rotasAdministracao,
+  ...rotasSite,
 
   // Configuração
   ['GET', '/configuracao', () => {
@@ -143,6 +145,7 @@ const FINALIDADES: FinalidadeAnexo[] = ['assinatura_recepcao', 'assinatura_aprov
 /** POST /processos/:id/anexos (multipart): ficheiro, tipo, finalidade?, legenda? */
 export async function handleUpload<T>(path: string, form: FormData): Promise<T> {
   await latencia();
+  if (path === '/site/imagens') return enviarImagemSite(form) as Promise<T>;
   const params = corresponder('/processos/:id/anexos', path);
   if (!params) throw new ApiError(404, `Rota inexistente: POST ${path}`);
   const u = exigir('processos.ver');
@@ -190,4 +193,18 @@ export async function handleUpload<T>(path: string, form: FormData): Promise<T> 
   auditar(u.id, 'anexar', 'processo', p.id, `${tipo}${finalidade ? ` (${finalidade})` : ''}`);
   guardar();
   return structuredClone(anexo) as T;
+}
+
+/** POST /site/imagens (multipart): ficheiro, alt. Só imagens, até 5 MB. No PHP: pasta pública /media/site. */
+async function enviarImagemSite(form: FormData) {
+  const u = exigir('site.gerir');
+  const ficheiro = form.get('ficheiro');
+  if (!(ficheiro instanceof Blob) || ficheiro.size === 0) throw new ApiError(422, 'Nenhum ficheiro recebido.');
+  if (!ficheiro.type.startsWith('image/')) throw new ApiError(422, 'Só são aceites imagens.');
+  if (ficheiro.size > 5 * 1024 * 1024) throw new ApiError(422, 'Imagem demasiado grande (máximo 5 MB).');
+  const id = novoId('anexo', 'site');
+  await guardarFicheiro(id, ficheiro);
+  auditar(u.id, 'enviar_imagem', 'site', id);
+  guardar();
+  return { url: `${PREFIXO_URL_MOCK}${id}`, alt: String(form.get('alt') ?? '').slice(0, 160) };
 }

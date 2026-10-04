@@ -39,6 +39,8 @@ export type Permissao =
   | 'definicoes.gerir'
   /** Criar, editar e desativar contas da equipa (só o administrador mexe em administradores). */
   | 'utilizadores.gerir'
+  /** Editar o site público (textos, fotografias, contactos). */
+  | 'site.gerir'
   | 'auditoria.ver'
   /** Cópias de segurança, estado do sistema e operações técnicas. */
   | 'sistema.admin';
@@ -72,6 +74,7 @@ export const PERMISSAO_LABEL: Record<Permissao, string> = {
   'equipa.ver': 'Ver equipa',
   'definicoes.gerir': 'Gerir definições',
   'utilizadores.gerir': 'Gerir utilizadores da equipa',
+  'site.gerir': 'Editar o site público',
   'auditoria.ver': 'Consultar a auditoria',
   'sistema.admin': 'Administrar o sistema',
 };
@@ -80,7 +83,8 @@ const TODAS = Object.keys(PERMISSAO_LABEL) as Permissao[];
 
 export const PERMISSOES_POR_PERFIL: Record<Perfil, Permissao[]> = {
   admin: TODAS,
-  direcao: TODAS.filter((p) => p !== 'sistema.admin'),
+  // O site público é gerido pelo administrador do sistema.
+  direcao: TODAS.filter((p) => p !== 'sistema.admin' && p !== 'site.gerir'),
   chefe_oficina: [
     'painel.ver', 'processos.ver', 'processos.criar', 'processos.cancelar', 'processos.atribuir',
     'diagnostico.editar', 'orcamento.editar', 'aprovacao.registar', 'reparacao.executar', 'qualidade.validar', 'entrega.registar',

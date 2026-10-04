@@ -853,3 +853,52 @@ export interface PaginaAuditoria {
   itens: EventoAuditoria[];
   total: number;
 }
+
+// ---------- Site público ----------
+
+export interface ImagemSite {
+  /** Caminho público (/site/...) ou ficheiro enviado pelo administrador. */
+  url: string;
+  alt: string;
+  /** Autor e licença, quando a fotografia não é da oficina. */
+  credito?: string;
+}
+
+export interface ConteudoSite {
+  hero: { titulo: string; subtitulo: string; imagem: ImagemSite };
+  /** Destaques curtos por baixo da imagem principal (ex.: "Aprovação online"). */
+  destaques: { titulo: string; texto: string }[];
+  modelos: { id: string; nome: string; descricao: string; imagem: ImagemSite }[];
+  servicos: { id: string; titulo: string; descricao: string; imagem: ImagemSite }[];
+  galeria: (ImagemSite & { id: string })[];
+  /** Só testemunhos reais, com autorização do cliente. */
+  testemunhos: { id: string; nome: string; viatura?: string; texto: string }[];
+  contactos: { telefone: string; whatsapp: string; email: string; morada: string; horario: string; mapaUrl?: string };
+  seo: { titulo: string; descricao: string };
+  atualizadoEm?: string;
+  atualizadoPorId?: string;
+}
+
+export type EstadoPedido = 'novo' | 'contactado' | 'marcado' | 'arquivado';
+export const ESTADO_PEDIDO_LABEL: Record<EstadoPedido, string> = {
+  novo: 'Por responder', contactado: 'Contactado', marcado: 'Marcado', arquivado: 'Arquivado',
+};
+
+/** Pedido de serviço feito no site público. */
+export interface PedidoServico {
+  id: string;
+  data: string;
+  nome: string;
+  telefone: string;
+  email?: string;
+  modelo?: string;
+  matricula?: string;
+  servico: string;
+  dataPreferida?: string;
+  mensagem?: string;
+  estado: EstadoPedido;
+  notas?: string;
+  tratadoPorId?: string;
+  tratadoEm?: string;
+  marcacaoId?: string;
+}

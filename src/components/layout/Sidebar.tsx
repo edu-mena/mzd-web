@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Car, CarFront, Users, Wrench, CalendarDays, Package, CreditCard,
-  BarChart3, UsersRound, Settings, HelpCircle, ChevronsLeft, ChevronsRight, X, MessagesSquare, ShieldCheck,
+  BarChart3, UsersRound, Settings, HelpCircle, ChevronsLeft, ChevronsRight, X, MessagesSquare, ShieldCheck, Globe,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -41,6 +41,7 @@ const secondary: NavItem[] = [
 ];
 
 const footerLinks: NavItem[] = [
+  { to: '/gestao-site', label: 'Site', icon: Globe, permissao: 'site.gerir' },
   { to: '/definicoes', label: 'Definições', icon: Settings, permissao: 'definicoes.gerir' },
   { to: '/ajuda', label: 'Ajuda / Suporte', icon: HelpCircle },
 ];

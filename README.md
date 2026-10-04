@@ -95,6 +95,22 @@ variável de ambiente `VITE_API_MODE=http` na configuração de build da Hosting
 O [public/.htaccess](public/.htaccess) encaminha as rotas da aplicação, deixa `/api` para o PHP, bloqueia
 ficheiros ocultos e de configuração e define cabeçalhos de segurança (HSTS e Content-Security-Policy: só scripts do próprio site) e de cache. O HTTPS está ativo e forçado no hPanel.
 
+## Site público
+
+`mzd.it.ao` abre o site da oficina para quem não tem sessão iniciada (com sessão, abre o painel); está sempre
+disponível em `/site`. Foco em Mitsubishi: modelos interativos, serviços, como funciona, galeria, testemunhos
+(só reais) e pedido de orçamento.
+
+- **Gestão:** o administrador do sistema edita tudo em **Site** (`/gestao-site`, permissão `site.gerir`):
+  textos, fotografias (enviadas e comprimidas no navegador), modelos, serviços, galeria, testemunhos, contactos
+  e o título/descrição para o Google.
+- **Pedidos:** o formulário cria um pedido (`POST /site/pedidos`, público, com campo-armadilha e limite por
+  número); a receção trata-os em Comunicações → Pedidos do site (ligar, WhatsApp, marcar dia, arquivar).
+- **Fotografias:** licença livre do Wikimedia Commons, guardadas em `public/site/`, com autor e licença em
+  "Créditos das fotografias" ([src/lib/site.ts](src/lib/site.ts)). A imagem principal foi retocada (pessoa removida).
+- **Marca:** a MZD apresenta-se como oficina independente; não se usa o logótipo da Mitsubishi.
+- **SEO:** o site é indexável; a área reservada, o login e o portal do cliente não (`robots.txt` + `noindex`).
+
 ## Modos de organização
 
 O mesmo sistema serve oficinas organizadas de formas diferentes, só pela escolha de perfis:

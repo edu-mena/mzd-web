@@ -13,6 +13,8 @@ import type {
   Perfil,
   ProcessoDetalhado,
   CopiaSeguranca,
+  ConteudoSite,
+  PedidoServico,
   Tarefa,
   Cliente,
   Configuracao,
@@ -29,6 +31,7 @@ import type {
 import { ESTADOS_ORDEM, ESTADO_LABEL, SISTEMAS_VEICULO, VERIFICACOES_SEGURANCA } from '../../types';
 import { calcularTotais } from '../../lib/calculos';
 import { MODELOS_PADRAO, preencherModelo, valoresDoContexto } from '../../lib/mensagens';
+import { CONTEUDO_SITE_PADRAO } from '../../lib/site';
 
 /** Notificação guardada no servidor; cada utilizador vê-a como lida ou não (ver /notificacoes). */
 export interface NotificacaoInterna {
@@ -43,7 +46,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 13;
+export const VERSAO_DB = 14;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -67,11 +70,13 @@ export interface MockDB {
   mensagens: Mensagem[];
   notificacoes: NotificacaoInterna[];
   copias: CopiaSeguranca[];
+  site: ConteudoSite;
+  pedidos: PedidoServico[];
   sequencias: {
     processo: number; fatura: number; peca: number; auditoria: number; pagamento: number;
     cliente: number; viatura: number; tarefa: number; tempo: number; adicional: number; anexo: number; marcacao: number;
     fornecedor: number; movimento: number; encomenda: number; recibo: number; fecho: number;
-    mensagem: number; notificacao: number; utilizador: number; copia: number;
+    mensagem: number; notificacao: number; utilizador: number; copia: number; pedido: number;
   };
 }
 
@@ -620,6 +625,14 @@ export function criarSeed(): MockDB {
     return { id: `cp${7 - k}`, data: d.toISOString(), tipo: 'automatica' as const, tamanhoBytes: 1_840_000 - k * 9_000, ficheiros: 0 };
   });
 
+  // ---------- Pedidos feitos no site público ----------
+  const horasAtras = (h: number) => new Date(agora - h * 3600000).toISOString();
+  const pedidos: PedidoServico[] = [
+    { id: 'ps3', data: horasAtras(2), nome: 'Wilson Domingos', telefone: '+244 923 410 552', modelo: 'L200 / Triton', servico: 'Tração 4x4', mensagem: 'A tração às quatro rodas não engata em andamento.', estado: 'novo' },
+    { id: 'ps2', data: horasAtras(26), nome: 'Marta Kissanga', telefone: '+244 912 337 801', email: 'marta.k@email.com', modelo: 'Pajero Sport', servico: 'Revisões e manutenção', dataPreferida: new Date(agora + 3 * 86400000).toISOString().slice(0, 10), estado: 'contactado', tratadoPorId: 'u1', tratadoEm: horasAtras(24), notas: 'Liga na segunda para confirmar a hora.' },
+    { id: 'ps1', data: horasAtras(80), nome: 'Alberto Cachimbo', telefone: '+244 931 902 114', modelo: 'Pajero', servico: 'Diagnóstico eletrónico', estado: 'arquivado', tratadoPorId: 'u1', tratadoEm: horasAtras(70), notas: 'Resolveu noutra oficina.' },
+  ];
+
   // ---------- Stock: inventário inicial e encomendas ----------
   const movimentos: MovimentoStock[] = pecas.map((pc, i) => ({
     id: `mv${i + 1}`, pecaId: pc.id, tipo: 'acerto', quantidade: pc.stock, stockApos: pc.stock,
@@ -659,13 +672,15 @@ export function criarSeed(): MockDB {
     mensagens,
     notificacoes,
     copias,
+    site: structuredClone(CONTEUDO_SITE_PADRAO),
+    pedidos,
     anexos: [],
     sequencias: {
       processo: 1000 + processos.length, fatura: 2000 + processos.length, peca: pecas.length, auditoria: 0, pagamento: seqPagamento,
       cliente: clientes.length, viatura: viaturas.length, tarefa: seqTarefa, tempo: seqTempo, adicional: 0, anexo: 0, marcacao: marcacoes.length,
       fornecedor: fornecedores.length, movimento: movimentos.length, encomenda: encomendas.length,
       recibo: todosPagamentos.length, fecho: fechos.length,
-      mensagem: mensagens.length, notificacao: notificacoes.length, utilizador: utilizadores.length, copia: copias.length,
+      mensagem: mensagens.length, notificacao: notificacoes.length, utilizador: utilizadores.length, copia: copias.length, pedido: pedidos.length,
     },
   };
 }

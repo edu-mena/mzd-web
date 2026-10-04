@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from './endpoints';
 import type { DecisaoPortal, FiltrosAuditoria, NovaMensagem, NovoProcesso } from './endpoints';
-import type { Configuracao, ModeloMensagem, Notificacao, ProcessoDetalhado } from '../types';
+import type { Configuracao, ConteudoSite, ModeloMensagem, Notificacao, ProcessoDetalhado } from '../types';
 
 // Chaves de cache centralizadas, para invalidar de forma consistente após alterações.
 export const chaves = {
@@ -277,3 +277,22 @@ export const useAuditoria = (filtros: FiltrosAuditoria) =>
   useQuery({ queryKey: [...chaves.auditoria, filtros], queryFn: () => api.auditoria.listar(filtros), placeholderData: (anterior) => anterior });
 export const useEstadoSistema = () => useQuery({ queryKey: ['sistema', 'estado'], queryFn: api.sistema.estado });
 export const useCopias = () => useQuery({ queryKey: ['sistema', 'copias'], queryFn: api.sistema.copias });
+
+// ---------- Site público ----------
+
+export const useSite = () => useQuery({ queryKey: ['site'], queryFn: api.site.obter, staleTime: 5 * 60_000 });
+
+export function useGuardarSite() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (dados: ConteudoSite) => api.site.guardar(dados), onSuccess: (c) => qc.setQueryData(['site'], c) });
+}
+
+export const usePedidosSite = (opcoes: Opcoes = {}) => useQuery({ queryKey: ['comunicacoes', 'pedidos-site'], queryFn: api.site.pedidos, refetchInterval: 2 * 60_000, ...opcoes });
+
+export function useTratarPedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...dados }: { id: string } & Parameters<typeof api.site.tratarPedido>[1]) => api.site.tratarPedido(id, dados),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['comunicacoes'] }),
+  });
+}
