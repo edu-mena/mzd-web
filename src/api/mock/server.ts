@@ -32,8 +32,8 @@ const rotas: [Metodo, string, Handler][] = [
     if (estado?.ate && estado.ate > Date.now()) {
       throw new ApiError(429, 'Demasiadas tentativas falhadas. Aguarde um minuto e tente novamente.');
     }
-    const u = db().utilizadores.find((x) => x.email.toLowerCase() === email);
-    if (!u || u.senha !== senha || !u.ativo) {
+    const u = email ? db().utilizadores.find((x) => x.email.toLowerCase() === email) : undefined;
+    if (!u || u.senha !== senha || !u.ativo || u.semAcesso) {
       const n = (estado?.n ?? 0) + 1;
       tentativas.set(email, { n, ate: n >= MAX_TENTATIVAS ? Date.now() + BLOQUEIO_MS : undefined });
       auditar(u?.id ?? null, 'login_falhado', 'sessao', undefined, email);

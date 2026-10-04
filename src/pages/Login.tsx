@@ -22,6 +22,7 @@ type Dados = z.infer<typeof esquema>;
 
 // Contas de demonstração (apenas no modo simulado). Palavra-passe: mzd2026.
 const CONTAS_DEMO: { email: string; perfil: Perfil }[] = [
+  { email: 'edna.sambo@mzdcarros.ao', perfil: 'rececao' },
   { email: 'amelia.zola@mzdcarros.ao', perfil: 'direcao' },
   { email: 'joel.paulo@mzdcarros.ao', perfil: 'chefe_oficina' },
   { email: 'sara.neto@mzdcarros.ao', perfil: 'rececionista' },

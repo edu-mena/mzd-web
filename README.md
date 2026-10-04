@@ -95,6 +95,20 @@ variável de ambiente `VITE_API_MODE=http` na configuração de build da Hosting
 O [public/.htaccess](public/.htaccess) encaminha as rotas da aplicação, deixa `/api` para o PHP, bloqueia
 ficheiros ocultos e de configuração e define cabeçalhos de segurança (HSTS e Content-Security-Policy: só scripts do próprio site) e de cache. O HTTPS está ativo e forçado no hPanel.
 
+## Modos de organização
+
+O mesmo sistema serve oficinas organizadas de formas diferentes, só pela escolha de perfis:
+
+- **Equipa completa** (oficinas maiores): rececionista, administrativa, chefe de oficina e mecânicos usam o sistema,
+  cada um na sua etapa.
+- **Receção com gestão completa** (ex.: MZD): três níveis — administradores do sistema, Direção e Receção. O perfil
+  `rececao` conduz o processo de ponta a ponta. Os técnicos são contas **sem acesso** (`semAcesso`): recebem trabalho
+  atribuído, aparecem nos relatórios e no quadro da Oficina, mas não entram; a receção regista o diagnóstico, as
+  tarefas e as horas em nome deles (`POST /processos/:id/tempo/manual`). Ficam para a Direção os descontos acima do
+  limite, reabrir a caixa, definições, relatórios, contas e auditoria.
+
+As contas reais criam-se na instalação do backend (fora do repositório, que é público).
+
 ## Acessibilidade
 
 - Todas as páginas (computador e telemóvel), por perfil, e as janelas principais passam a auditoria axe-core

@@ -53,12 +53,16 @@ function exigirSobre(u: UtilizadorComSenha, alvo: { perfil: Perfil }) {
 
 function validarDados(body: any, ignorarId?: string) {
   const nome = texto(body?.nome, 'Nome', 3, 80);
-  const email = texto(body?.email, 'Email', 5, 120).toLowerCase();
-  if (!EMAIL.test(email)) throw new ApiError(422, 'Email inválido.');
-  if (db().utilizadores.some((x) => x.id !== ignorarId && x.email.toLowerCase() === email)) throw new ApiError(409, 'Já existe uma conta com este email.');
-  const telefone = body?.telefone ? String(body.telefone).trim().slice(0, 20) || undefined : undefined;
   const perfil = umDe(body?.perfil, PERFIS, 'Perfil');
-  return { nome, email, telefone, perfil };
+  // Técnico sem acesso: só existe para lhe atribuir trabalho; não tem email nem palavra-passe.
+  const semAcesso = body?.semAcesso === true;
+  if (semAcesso && perfil !== 'mecanico') throw new ApiError(422, 'Só técnicos (mecânicos) podem existir sem acesso ao sistema.');
+  const emailBruto = String(body?.email ?? '').trim().toLowerCase();
+  const email = semAcesso && !emailBruto ? '' : texto(emailBruto, 'Email', 5, 120);
+  if (email && !EMAIL.test(email)) throw new ApiError(422, 'Email inválido.');
+  if (email && db().utilizadores.some((x) => x.id !== ignorarId && x.email.toLowerCase() === email)) throw new ApiError(409, 'Já existe uma conta com este email.');
+  const telefone = body?.telefone ? String(body.telefone).trim().slice(0, 20) || undefined : undefined;
+  return { nome, email, telefone, perfil, semAcesso: semAcesso || undefined };
 }
 
 export function criarCopia(tipo: CopiaSeguranca['tipo'], criadoPorId?: string, data = new Date().toISOString()): CopiaSeguranca {
@@ -91,12 +95,13 @@ export const rotasAdministracao: [Metodo, string, Handler][] = [
     const senha = senhaTemporaria();
     const novo: UtilizadorComSenha = {
       id: novoId('utilizador', 'u'), ...dados, avatarIniciais: iniciais(dados.nome), ativo: true,
-      senha, mudarSenha: true, criadoEm: new Date().toISOString(),
+      // Sem acesso: a palavra-passe é aleatória e nunca é mostrada (a conta não entra).
+      senha, mudarSenha: !dados.semAcesso, criadoEm: new Date().toISOString(),
     };
     db().utilizadores.push(novo);
-    auditar(u.id, 'criar', 'utilizador', novo.id, `${novo.nome} · ${PERFIL_LABEL[novo.perfil]}`);
+    auditar(u.id, 'criar', 'utilizador', novo.id, `${novo.nome} · ${PERFIL_LABEL[novo.perfil]}${dados.semAcesso ? ' · sem acesso' : ''}`);
     guardar();
-    return { utilizador: publico(novo), senhaTemporaria: senha };
+    return { utilizador: publico(novo), senhaTemporaria: dados.semAcesso ? null : senha };
   }],
 
   ['PUT', '/utilizadores/:id', ({ params, body }) => {
@@ -109,7 +114,13 @@ export const rotasAdministracao: [Metodo, string, Handler][] = [
     if (alvo.perfil === 'admin' && dados.perfil !== 'admin' && alvo.ativo && adminsAtivos().length === 1) {
       throw new ApiError(422, 'Tem de existir sempre um administrador do sistema ativo.');
     }
-    const mudancas = [alvo.perfil !== dados.perfil && `perfil: ${PERFIL_LABEL[alvo.perfil]} → ${PERFIL_LABEL[dados.perfil]}`, alvo.email !== dados.email && 'email'].filter(Boolean).join(', ');
+    const mudancas = [
+      alvo.perfil !== dados.perfil && `perfil: ${PERFIL_LABEL[alvo.perfil]} → ${PERFIL_LABEL[dados.perfil]}`,
+      alvo.email !== dados.email && 'email',
+      !!alvo.semAcesso !== !!dados.semAcesso && (dados.semAcesso ? 'acesso retirado' : 'acesso dado'),
+    ].filter(Boolean).join(', ');
+    // Passa a ter acesso: precisa de uma palavra-passe temporária (botão "Senha") antes de entrar.
+    if (alvo.semAcesso && !dados.semAcesso) Object.assign(alvo, { senha: senhaTemporaria(), mudarSenha: true });
     Object.assign(alvo, dados, { avatarIniciais: iniciais(dados.nome) });
     auditar(u.id, 'editar', 'utilizador', alvo.id, mudancas || undefined);
     guardar();
@@ -140,6 +151,7 @@ export const rotasAdministracao: [Metodo, string, Handler][] = [
     const alvo = obterUtilizador(params.id);
     exigirSobre(u, alvo);
     if (alvo.id === u.id) throw new ApiError(422, 'Para mudar a sua palavra-passe, use "Alterar palavra-passe" no seu menu.');
+    if (alvo.semAcesso) throw new ApiError(422, `${alvo.nome} não tem acesso ao sistema. Para lhe dar acesso, edite a conta e indique um email.`);
     const senha = senhaTemporaria();
     alvo.senha = senha;
     alvo.mudarSenha = true;

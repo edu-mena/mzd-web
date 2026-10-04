@@ -54,6 +54,8 @@ export type Perfil =
   | 'chefe_oficina'
   | 'administrativa'
   | 'rececionista'
+  /** Receção que conduz o processo inteiro (oficinas em que a equipa técnica não usa o sistema). */
+  | 'rececao'
   | 'mecanico';
 
 export const PERFIL_LABEL: Record<Perfil, string> = {
@@ -62,6 +64,7 @@ export const PERFIL_LABEL: Record<Perfil, string> = {
   chefe_oficina: 'Chefe de Oficina',
   administrativa: 'Assistente Administrativa',
   rececionista: 'Rececionista',
+  rececao: 'Receção (gestão completa)',
   mecanico: 'Mecânico',
 };
 
@@ -77,6 +80,11 @@ export interface Utilizador {
   tempoMedioHoras?: number;
   /** Palavra-passe temporária: tem de a mudar antes de usar o sistema. */
   mudarSenha?: boolean;
+  /**
+   * Técnico sem acesso ao sistema: recebe trabalho atribuído, mas não entra (sem email nem palavra-passe).
+   * A receção regista o trabalho em nome dele.
+   */
+  semAcesso?: boolean;
   ultimoAcesso?: string;
   criadoEm?: string;
 }
@@ -228,6 +236,9 @@ export interface RegistoTempo {
   mecanicoId: string;
   inicio: string;
   fim?: string;
+  /** Preenchido quando as horas foram registadas por outra pessoa (ex.: a receção). */
+  registadoPorId?: string;
+  nota?: string;
 }
 
 export interface Entrega {

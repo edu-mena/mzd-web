@@ -36,8 +36,12 @@ export function notificar(
   autorId?: string,
 ) {
   const base = db();
-  const utilizadores = [...new Set(destino.utilizadores?.filter((x): x is string => !!x && x !== autorId) ?? [])];
-  if (utilizadores.length === 0 && !destino.perfis?.length) return;
+  const semAcesso = new Set(base.utilizadores.filter((x) => x.semAcesso).map((x) => x.id));
+  const utilizadores = [...new Set(destino.utilizadores?.filter((x): x is string => !!x && x !== autorId && !semAcesso.has(x)) ?? [])];
+  // A Receção com gestão completa faz o trabalho da receção, da administrativa e do chefe de oficina.
+  const perfis = [...(destino.perfis ?? [])];
+  if (perfis.some((p) => p === 'rececionista' || p === 'administrativa' || p === 'chefe_oficina') && !perfis.includes('rececao')) perfis.push('rececao');
+  if (utilizadores.length === 0 && !perfis.length) return;
   base.notificacoes.unshift({
     id: novoId('notificacao', 'nt'),
     data: new Date().toISOString(),
@@ -45,15 +49,18 @@ export function notificar(
     texto: textoNotificacao,
     link,
     utilizadores,
-    perfis: destino.perfis ?? [],
+    perfis,
     autorId,
     lidaPor: [],
   });
   base.notificacoes = base.notificacoes.slice(0, 500);
 }
 
+/** A Receção com gestão completa também vê o que era dirigido ao balcão e à chefia. */
+const PERFIS_ABRANGIDOS: Partial<Record<Perfil, Perfil[]>> = { rececao: ['rececao', 'rececionista', 'administrativa', 'chefe_oficina'] };
+
 const paraMim = (n: NotificacaoInterna, id: string, perfil: Perfil) =>
-  n.autorId !== id && (n.utilizadores.includes(id) || n.perfis.includes(perfil));
+  n.autorId !== id && (n.utilizadores.includes(id) || (PERFIS_ABRANGIDOS[perfil] ?? [perfil]).some((p) => n.perfis.includes(p)));
 
 function resumoProcesso(p: Processo) {
   const v = db().viaturas.find((x) => x.id === p.viaturaId);

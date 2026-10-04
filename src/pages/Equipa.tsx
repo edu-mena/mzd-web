@@ -36,7 +36,7 @@ export default function Equipa() {
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-mzd-black font-display text-sm font-bold text-white">{u.avatarIniciais}</span>
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-mzd-black">{u.nome}</p>
-                  <p className="rotulo mt-0.5">{PERFIL_LABEL[u.perfil]}</p>
+                  <p className="rotulo mt-0.5">{PERFIL_LABEL[u.perfil]}{u.semAcesso && ' · sem acesso ao sistema'}</p>
                 </div>
                 <span className={`ml-auto h-2 w-2 shrink-0 rounded-full ${u.ativo ? 'bg-sinal-verde' : 'bg-zinc-300'}`} title={u.ativo ? 'Ativo' : 'Inativo'} />
               </div>

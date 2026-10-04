@@ -65,7 +65,7 @@ export interface DecisaoPortal {
   motivo?: string;
 }
 
-export interface DadosUtilizador { nome: string; email: string; telefone?: string; perfil: Perfil }
+export interface DadosUtilizador { nome: string; email: string; telefone?: string; perfil: Perfil; semAcesso?: boolean }
 
 export interface FiltrosAuditoria { de?: string; ate?: string; utilizadorId?: string; entidade?: string; q?: string; pagina?: number; tamanho?: number }
 
@@ -174,7 +174,8 @@ export const api = {
   },
   utilizadores: {
     listar: () => request<Utilizador[]>('GET', '/utilizadores'),
-    criar: (dados: DadosUtilizador) => request<{ utilizador: Utilizador; senhaTemporaria: string }>('POST', '/utilizadores', dados),
+    /** `senhaTemporaria` é null para técnicos sem acesso. */
+    criar: (dados: DadosUtilizador) => request<{ utilizador: Utilizador; senhaTemporaria: string | null }>('POST', '/utilizadores', dados),
     editar: (id: string, dados: DadosUtilizador) => request<Utilizador>('PUT', `/utilizadores/${id}`, dados),
     definirAtivo: (id: string, ativo: boolean) => request<Utilizador>('PATCH', `/utilizadores/${id}/estado`, { ativo }),
     reporSenha: (id: string) => request<{ senhaTemporaria: string }>('POST', `/utilizadores/${id}/senha`),
@@ -209,6 +210,9 @@ export const api = {
     marcarTarefa: (id: string, tarefaId: string, feita: boolean) => request<ProcessoDetalhado>('PATCH', `/processos/${id}/tarefas/${tarefaId}`, { feita }),
     definirPecasEmFalta: (id: string, aguardaPecas: boolean, nota?: string) => request<ProcessoDetalhado>('PATCH', `/processos/${id}/pecas`, { aguardaPecas, nota }),
     cronometro: (id: string, acao: 'iniciar' | 'parar') => request<ProcessoDetalhado>('POST', `/processos/${id}/tempo`, { acao }),
+    /** Horas já trabalhadas, registadas por quem gere o processo em nome do técnico. */
+    registarHoras: (id: string, dados: { mecanicoId: string; horas: number; data?: string; nota?: string }) =>
+      request<ProcessoDetalhado>('POST', `/processos/${id}/tempo/manual`, dados),
     proporAdicional: (id: string, dados: { justificacao: string; pecas: ItemOrcamentoPeca[]; maoObra: ItemOrcamentoMaoObra[] }) =>
       request<ProcessoDetalhado>('POST', `/processos/${id}/adicionais`, dados),
     decidirAdicional: (id: string, adicionalId: string, dados: { decisao: 'aprovado' | 'recusado'; metodo: MetodoAprovacao; autorizadoPor: string }) =>

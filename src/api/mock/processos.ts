@@ -459,15 +459,41 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     exigirMecanicoDoProcesso(p, u);
     const acao = umDe(body?.acao, ['iniciar', 'parar'] as const, 'Ação');
     const agora = new Date().toISOString();
+    // O cronómetro conta para quem trabalha: o próprio mecânico ou, se for outra pessoa a usá-lo, o técnico atribuído.
+    const tecnico = u.perfil === 'mecanico' ? u.id : p.mecanicoId;
+    if (!tecnico) throw new ApiError(422, 'Atribua um técnico ao processo primeiro.');
     if (acao === 'iniciar') {
-      const outro = db().processos.find((x) => (x.registosTempo ?? []).some((r) => !r.fim && r.mecanicoId === u.id));
-      if (outro) throw new ApiError(422, `Já tem um cronómetro ativo em ${outro.numero}. Pare-o primeiro.`);
-      p.registosTempo = [...(p.registosTempo ?? []), { id: novoId('tempo', 'r'), mecanicoId: u.id, inicio: agora }];
+      const outro = db().processos.find((x) => (x.registosTempo ?? []).some((r) => !r.fim && r.mecanicoId === tecnico));
+      if (outro) throw new ApiError(422, `Já há um cronómetro ativo para este técnico em ${outro.numero}. Pare-o primeiro.`);
+      p.registosTempo = [...(p.registosTempo ?? []), { id: novoId('tempo', 'r'), mecanicoId: tecnico, inicio: agora, registadoPorId: tecnico === u.id ? undefined : u.id }];
     } else {
-      const ativo = (p.registosTempo ?? []).find((r) => !r.fim && r.mecanicoId === u.id);
+      const ativo = (p.registosTempo ?? []).find((r) => !r.fim && r.mecanicoId === tecnico);
       if (!ativo) throw new ApiError(422, 'Não tem nenhum cronómetro ativo neste processo.');
       ativo.fim = agora;
     }
+    return guardarEDetalhar(p, u);
+  }],
+
+  // Horas registadas depois do trabalho (quem regista não é quem trabalhou: ex. a receção pelos técnicos).
+  ['POST', '/processos/:id/tempo/manual', ({ params, body }) => {
+    const u = exigir('reparacao.executar');
+    const p = obterProcesso(params.id);
+    exigirEstado(p, 'em_reparacao', 'controlo_qualidade');
+    exigirMecanicoDoProcesso(p, u);
+    const tecnico = db().utilizadores.find((x) => x.id === (body?.mecanicoId ?? p.mecanicoId) && x.perfil === 'mecanico' && x.ativo);
+    if (!tecnico) throw new ApiError(422, 'Escolha o técnico que fez o trabalho.');
+    if (u.perfil === 'mecanico' && tecnico.id !== u.id) throw new ApiError(403, 'Só pode registar as suas próprias horas.');
+    const horas = numero(body?.horas, 'Horas', { min: 0.25, max: 24 });
+    const fim = body?.data ? new Date(String(body.data)) : new Date();
+    if (Number.isNaN(fim.getTime()) || fim.getTime() > Date.now() + 60000) throw new ApiError(422, 'Data inválida.');
+    if (fim.getTime() < new Date(p.criadoEm).getTime()) throw new ApiError(422, 'A data é anterior à entrada da viatura.');
+    const nota = body?.nota ? String(body.nota).trim().slice(0, 200) || undefined : undefined;
+    p.registosTempo = [...(p.registosTempo ?? []), {
+      id: novoId('tempo', 'r'), mecanicoId: tecnico.id, inicio: new Date(fim.getTime() - horas * 3600000).toISOString(), fim: fim.toISOString(),
+      registadoPorId: u.id === tecnico.id ? undefined : u.id, nota,
+    }];
+    registarHistorico(p, u.nome, `${horas.toLocaleString('pt-PT')} h de trabalho registadas para ${tecnico.nome}${nota ? ` (${nota})` : ''}`, 'nota');
+    auditar(u.id, 'registar_horas', 'processo', p.id, `${tecnico.nome} · ${horas} h`);
     return guardarEDetalhar(p, u);
   }],
 

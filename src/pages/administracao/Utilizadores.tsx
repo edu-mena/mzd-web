@@ -11,7 +11,7 @@ import { Card } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Drawer from '../../components/ui/Drawer';
 import Modal from '../../components/ui/Modal';
-import { Field, Input, Select } from '../../components/ui/Form';
+import { Checkbox, Field, Input, Select } from '../../components/ui/Form';
 import { Aviso } from '../../components/ui/Controls';
 import { Table, Th, Tr, Td } from '../../components/ui/Table';
 import { Carregando, ErroCarregamento } from '../../components/ui/Estados';
@@ -69,10 +69,10 @@ export default function Utilizadores() {
               <Tr key={u.id} className={clsx(!u.ativo && 'opacity-60')}>
                 <Td>
                   <span className="block font-semibold text-mzd-black">{u.nome}{u.id === user?.id && <span className="ml-1.5 text-xs font-normal text-mzd-gray">(você)</span>}</span>
-                  <span className="block text-xs text-mzd-gray">{u.email}</span>
+                  <span className="block text-xs text-mzd-gray">{u.email || 'Não entra no sistema'}</span>
                 </Td>
                 <Td className="text-mzd-black">{PERFIL_LABEL[u.perfil]}</Td>
-                <Td className="text-mzd-gray">{u.ultimoAcesso ? haQuanto(u.ultimoAcesso, agora) : 'Nunca entrou'}</Td>
+                <Td className="text-mzd-gray">{u.semAcesso ? 'Sem acesso (técnico)' : u.ultimoAcesso ? haQuanto(u.ultimoAcesso, agora) : 'Nunca entrou'}</Td>
                 <Td>
                   <span className={clsx('rotulo', u.ativo ? '!text-sinal-verde' : '')}>{u.ativo ? 'Ativo' : 'Inativo'}</span>
                   {u.mudarSenha && u.ativo && <span className="block text-[11px] text-sinal-ambar">Senha temporária por mudar</span>}
@@ -81,7 +81,7 @@ export default function Utilizadores() {
                   {podeGerir(u) && (
                     <div className="flex justify-end gap-1">
                       <Button variante="fantasma" tamanho="sm" icone={<Pencil size={13} />} onClick={() => setEditar(u)} aria-label={`Editar ${u.nome}`}>Editar</Button>
-                      {u.id !== user?.id && u.ativo && (
+                      {u.id !== user?.id && u.ativo && !u.semAcesso && (
                         <Button variante="fantasma" tamanho="sm" icone={<KeyRound size={13} />} onClick={() => setConfirmar({ u, acao: 'senha' })} aria-label={`Repor a palavra-passe de ${u.nome}`}>Senha</Button>
                       )}
                       {u.id !== user?.id && (
@@ -100,7 +100,7 @@ export default function Utilizadores() {
         <FormUtilizador
           utilizador={editar === 'novo' ? undefined : editar}
           onFechar={() => setEditar(null)}
-          onCriado={(nome, s) => { setEditar(null); setSenha({ nome, senha: s, nova: true }); }}
+          onCriado={(nome, s) => { setEditar(null); if (s) setSenha({ nome, senha: s, nova: true }); else toast(`${nome} registado (sem acesso ao sistema)`); }}
         />
       )}
 
@@ -147,19 +147,26 @@ function SenhaTemporaria({ nome, senha }: { nome: string; senha: string }) {
   );
 }
 
-function FormUtilizador({ utilizador: u, onFechar, onCriado }: { utilizador?: Utilizador; onFechar: () => void; onCriado: (nome: string, senha: string) => void }) {
+function FormUtilizador({ utilizador: u, onFechar, onCriado }: { utilizador?: Utilizador; onFechar: () => void; onCriado: (nome: string, senha: string | null) => void }) {
   const { user, can } = useAuth();
   const toast = useToast();
   const alterar = useAlterarUtilizador<unknown>();
-  const [d, setD] = useState<DadosUtilizador>({ nome: u?.nome ?? '', email: u?.email ?? '', telefone: u?.telefone ?? '', perfil: u?.perfil ?? 'rececionista' });
+  const [d, setD] = useState<DadosUtilizador>({ nome: u?.nome ?? '', email: u?.email ?? '', telefone: u?.telefone ?? '', perfil: u?.perfil ?? 'rececao', semAcesso: u?.semAcesso ?? false });
+  const semAcesso = d.perfil === 'mecanico' && !!d.semAcesso;
   const perfis = (Object.keys(PERFIL_LABEL) as Perfil[]).filter((p) => p !== 'admin' || can('sistema.admin'));
   const proprio = u?.id === user?.id;
 
   const guardar = () => alterar.mutate(
-    () => (u ? api.utilizadores.editar(u.id, d) : api.utilizadores.criar(d)),
+    () => {
+      const dados = { ...d, semAcesso: semAcesso || undefined };
+      return u ? api.utilizadores.editar(u.id, dados) : api.utilizadores.criar(dados);
+    },
     {
       onSuccess: (r) => {
-        if (u) { toast('Utilizador atualizado'); onFechar(); } else onCriado(d.nome, (r as { senhaTemporaria: string }).senhaTemporaria);
+        if (u) {
+          toast(u.semAcesso && !semAcesso ? 'Acesso dado — gere a palavra-passe temporária com o botão "Senha"' : 'Utilizador atualizado');
+          onFechar();
+        } else onCriado(d.nome, (r as { senhaTemporaria: string | null }).senhaTemporaria);
       },
       onError: (e) => toast(mensagemErro(e), 'erro'),
     },
@@ -174,7 +181,9 @@ function FormUtilizador({ utilizador: u, onFechar, onCriado }: { utilizador?: Ut
     >
       <div className="space-y-4">
         <Field label="Nome completo">{(a) => <Input {...a} value={d.nome} onChange={(e) => setD({ ...d, nome: e.target.value })} autoFocus />}</Field>
-        <Field label="Email" hint="É o nome de utilizador para entrar">{(a) => <Input {...a} type="email" value={d.email} onChange={(e) => setD({ ...d, email: e.target.value })} />}</Field>
+        {!semAcesso && (
+          <Field label="Email" hint="É o nome de utilizador para entrar">{(a) => <Input {...a} type="email" value={d.email} onChange={(e) => setD({ ...d, email: e.target.value })} />}</Field>
+        )}
         <Field label="Telefone" hint="Opcional">{(a) => <Input {...a} value={d.telefone} onChange={(e) => setD({ ...d, telefone: e.target.value })} className="num" />}</Field>
         <Field label="Perfil" hint={proprio ? 'Não pode mudar o seu próprio perfil.' : 'Define o que a pessoa pode ver e fazer (ver Permissões).'}>
           {(a) => (
@@ -183,6 +192,11 @@ function FormUtilizador({ utilizador: u, onFechar, onCriado }: { utilizador?: Ut
             </Select>
           )}
         </Field>
+        {d.perfil === 'mecanico' && (
+          <Checkbox checked={!!d.semAcesso} onChange={(v) => setD({ ...d, semAcesso: v })}>
+            Sem acesso ao sistema — o técnico recebe trabalho atribuído, mas é a receção que regista o que ele faz
+          </Checkbox>
+        )}
       </div>
     </Drawer>
   );

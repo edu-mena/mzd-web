@@ -18,6 +18,14 @@ const DESCRICAO_ETAPA: Record<string, string> = {
 };
 
 const GUIAS: Record<Perfil, string[]> = {
+  rececao: [
+    'Conduz o processo inteiro: os técnicos não usam o sistema, por isso é a receção que regista o que eles fazem.',
+    'Receção: "Nova receção" ou "Receção" numa marcação; atribua logo o técnico (Oficina ou no processo).',
+    'Diagnóstico: preencha o que o técnico encontrou, com fotografias. Depois o orçamento e o envio ao cliente (WhatsApp, email ou link).',
+    'Reparação: marque as tarefas feitas e registe as horas de cada técnico em "Registar horas".',
+    'Controlo de qualidade, pagamento, recibo e entrega também são seus. Feche a caixa ao fim do dia.',
+    'Descontos acima do limite e reabrir uma caixa fechada pedem a Direção.',
+  ],
   rececionista: [
     'O painel mostra as chegadas de hoje, as viaturas prontas e os orçamentos à espera do cliente.',
     'Receção: "Nova receção" ou "Receção" numa marcação. A matrícula é procurada antes de criar cliente novo.',

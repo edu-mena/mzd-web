@@ -98,6 +98,15 @@ export const PERMISSOES_POR_PERFIL: Record<Perfil, Permissao[]> = {
     'orcamento.editar', 'aprovacao.registar', 'entrega.registar',
     'clientes.ver', 'clientes.editar', 'viaturas.ver', 'mensagens.enviar', 'agenda.ver', 'agenda.gerir', 'pecas.ver', 'valores.ver',
   ],
+  // Receção com gestão completa: conduz o processo de ponta a ponta e regista o trabalho dos técnicos.
+  // Fica para a Direção: descontos acima do limite, reabrir caixa, definições, relatórios, contas e auditoria.
+  rececao: [
+    'painel.ver', 'processos.ver', 'processos.criar', 'processos.cancelar', 'processos.atribuir',
+    'diagnostico.editar', 'orcamento.editar', 'aprovacao.registar', 'reparacao.executar', 'qualidade.validar',
+    'pagamentos.registar', 'entrega.registar',
+    'clientes.ver', 'clientes.editar', 'clientes.fundir', 'viaturas.ver', 'mensagens.enviar', 'agenda.ver', 'agenda.gerir',
+    'pecas.ver', 'pecas.editar', 'valores.ver', 'faturacao.ver', 'equipa.ver',
+  ],
   mecanico: ['painel.ver', 'processos.ver', 'diagnostico.editar', 'reparacao.executar', 'viaturas.ver', 'agenda.ver', 'pecas.ver'],
 };
 

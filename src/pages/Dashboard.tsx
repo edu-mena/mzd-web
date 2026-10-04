@@ -37,7 +37,7 @@ const atrasado = (p: ProcessoDetalhado) => estaAtivo(p.estado) && diasEntre(p.pr
 export default function Dashboard() {
   const { user } = useAuth();
   if (user?.perfil === 'mecanico') return <PainelMecanico />;
-  if (user?.perfil === 'rececionista' || user?.perfil === 'administrativa') return <PainelBalcao />;
+  if (user?.perfil === 'rececionista' || user?.perfil === 'administrativa' || user?.perfil === 'rececao') return <PainelBalcao />;
   return <PainelGestao />;
 }
 

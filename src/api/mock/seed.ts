@@ -43,7 +43,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 12;
+export const VERSAO_DB = 13;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -103,12 +103,16 @@ export function criarSeed(): MockDB {
     { id: 'u6', nome: 'Joel Paulo', perfil: 'chefe_oficina' },
     { id: 'u7', nome: 'Amélia Zola', perfil: 'direcao' },
     { id: 'u8', nome: 'Nelson Tavares', perfil: 'admin' },
+    // Modo "receção completa" (ex.: MZD): a receção conduz tudo e os técnicos não usam o sistema.
+    { id: 'u9', nome: 'Edna Sambo', perfil: 'rececao' },
+    { id: 'u10', nome: 'Manuel Cassule', perfil: 'mecanico', semAcesso: true },
+    { id: 'u11', nome: 'Adão Txipa', perfil: 'mecanico', semAcesso: true },
   ];
   const utilizadores: UtilizadorComSenha[] = baseUtilizadores.map((u) => {
     const partes = semAcentos(u.nome).toLowerCase().split(' ');
     return {
       ...u,
-      email: `${partes[0]}.${partes[partes.length - 1]}@mzdcarros.ao`,
+      email: u.semAcesso ? '' : `${partes[0]}.${partes[partes.length - 1]}@mzdcarros.ao`,
       avatarIniciais: u.nome.split(' ').map((p) => p[0]).slice(0, 2).join(''),
       ativo: true,
       senha: SENHA_DEMO,
@@ -608,7 +612,7 @@ export function criarSeed(): MockDB {
   notificacoes.sort((a, b) => b.data.localeCompare(a.data)).forEach((n, i, l) => { n.id = `nt${l.length - i}`; });
 
   // ---------- Administração: últimos acessos e cópias automáticas (Cron às 03:00) ----------
-  utilizadores.forEach((u, i) => { u.ultimoAcesso = new Date(agora - (i * 7 + 2) * 3600000).toISOString(); });
+  utilizadores.forEach((u, i) => { if (!u.semAcesso) u.ultimoAcesso = new Date(agora - (i * 7 + 2) * 3600000).toISOString(); });
   const copias: CopiaSeguranca[] = Array.from({ length: 7 }, (_, k) => {
     const d = new Date(agora - k * 86400000);
     d.setHours(3, 0, 0, 0);

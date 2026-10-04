@@ -22,7 +22,7 @@ export function publico(u: UtilizadorComSenha): Utilizador {
 
 export function utilizadorAtual(): UtilizadorComSenha {
   const id = sessaoAtual();
-  const u = id ? db().utilizadores.find((x) => x.id === id && x.ativo) : undefined;
+  const u = id ? db().utilizadores.find((x) => x.id === id && x.ativo && !x.semAcesso) : undefined;
   if (!u) throw new ApiError(401, 'Sessão expirada. Inicie sessão novamente.');
   return u;
 }
