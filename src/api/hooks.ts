@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { api } from './endpoints';
-import type { DecisaoPortal, NovaMensagem, NovoProcesso } from './endpoints';
+import type { DecisaoPortal, FiltrosAuditoria, NovaMensagem, NovoProcesso } from './endpoints';
 import type { Configuracao, ModeloMensagem, Notificacao, ProcessoDetalhado } from '../types';
 
 // Chaves de cache centralizadas, para invalidar de forma consistente após alterações.
@@ -258,3 +258,22 @@ export const useRelatorio = (de: string, ate: string) =>
 
 /** Alertas do painel; refrescam com qualquer alteração (ver refrescarComunicacoes) e a cada 2 minutos. */
 export const useAlertas = () => useQuery({ queryKey: ['comunicacoes', 'alertas'], queryFn: api.relatorios.alertas, refetchInterval: 2 * 60_000 });
+
+// ---------- Administração ----------
+
+/** Criar/editar/desativar utilizadores e repor palavras-passe. */
+export function useAlterarUtilizador<T>() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (executar: () => Promise<T>) => executar(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: chaves.utilizadores });
+      qc.invalidateQueries({ queryKey: chaves.auditoria });
+    },
+  });
+}
+
+export const useAuditoria = (filtros: FiltrosAuditoria) =>
+  useQuery({ queryKey: [...chaves.auditoria, filtros], queryFn: () => api.auditoria.listar(filtros), placeholderData: (anterior) => anterior });
+export const useEstadoSistema = () => useQuery({ queryKey: ['sistema', 'estado'], queryFn: api.sistema.estado });
+export const useCopias = () => useQuery({ queryKey: ['sistema', 'copias'], queryFn: api.sistema.copias });

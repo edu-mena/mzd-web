@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Car, CarFront, Users, Wrench, CalendarDays, Package, CreditCard,
-  BarChart3, UsersRound, Settings, HelpCircle, ChevronsLeft, ChevronsRight, X, MessagesSquare,
+  BarChart3, UsersRound, Settings, HelpCircle, ChevronsLeft, ChevronsRight, X, MessagesSquare, ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
@@ -37,6 +37,7 @@ const primary: NavItem[] = [
 const secondary: NavItem[] = [
   { to: '/relatorios', label: 'Relatórios & KPIs', icon: BarChart3, permissao: 'relatorios.ver' },
   { to: '/equipa', label: 'Equipa', icon: UsersRound, permissao: 'equipa.ver' },
+  { to: '/administracao', label: 'Administração', icon: ShieldCheck, permissao: 'auditoria.ver' },
 ];
 
 const footerLinks: NavItem[] = [

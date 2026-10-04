@@ -75,6 +75,10 @@ export interface Utilizador {
   ativo: boolean;
   osConcluidas?: number;
   tempoMedioHoras?: number;
+  /** Palavra-passe temporária: tem de a mudar antes de usar o sistema. */
+  mudarSenha?: boolean;
+  ultimoAcesso?: string;
+  criadoEm?: string;
 }
 
 // ---------- Clientes e viaturas ----------
@@ -807,5 +811,34 @@ export interface AlertaPainel {
   titulo: string;
   texto: string;
   link: string;
+  total: number;
+}
+
+// ---------- Administração ----------
+
+export interface CopiaSeguranca {
+  id: string;
+  data: string;
+  tipo: 'automatica' | 'manual';
+  /** Base de dados comprimida. */
+  tamanhoBytes: number;
+  /** Ficheiros (fotos, vídeos, assinaturas) incluídos. */
+  ficheiros: number;
+  criadoPorId?: string;
+}
+
+export interface EstadoSistema {
+  versaoServidor: string;
+  baseDados: { processos: number; clientes: number; viaturas: number; mensagens: number; eventosAuditoria: number };
+  anexos: { total: number; bytes: number };
+  /** Espaço do plano de alojamento (Hostinger Startup: 200 GB). */
+  limiteArmazenamentoBytes: number;
+  ultimaCopia?: CopiaSeguranca;
+  utilizadoresAtivos: number;
+  loginsFalhados24h: number;
+}
+
+export interface PaginaAuditoria {
+  itens: EventoAuditoria[];
   total: number;
 }

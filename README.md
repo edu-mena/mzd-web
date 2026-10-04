@@ -71,6 +71,10 @@ src/
   depois da entrega. No modo de demonstração o portal só funciona no mesmo navegador (os dados são locais).
 - Relatórios e alertas em [src/api/mock/relatorios.ts](src/api/mock/relatorios.ts): `GET /relatorios?de&ate` devolve
   agregados (no PHP, consultas SQL com GROUP BY) e `GET /painel/alertas` os alertas já filtrados pelas permissões.
+- Administração em [src/api/mock/administracao.ts](src/api/mock/administracao.ts): contas desativam-se (nunca se apagam),
+  palavras-passe com `password_hash`, senha temporária com `mudarSenha` (o servidor só aceita `/auth/*` até ser trocada).
+  Cópias de segurança: Cron diário às 03:00 com `mysqldump` + pasta de ficheiros, comprimidos, fora de `public_html`,
+  guardados 30 dias; a reposição faz-se por SSH.
 - As notificações internas são consultadas a cada minuto (`GET /notificacoes`): o alojamento partilhado não
   mantém ligações abertas em tempo real.
 
@@ -105,5 +109,5 @@ ficheiros ocultos e de configuração e define cabeçalhos de segurança (inclui
 | F7 | Comunicações: modelos com variáveis, registo de mensagens, clientes por avisar, notificações internas | ✅ |
 | F8 | Portal do cliente: link pessoal, percurso, orçamento e aprovação online, levantamento | ✅ |
 | F9 | Painéis por função, alertas "pede atenção", relatórios por período com comparação e CSV | ✅ |
-| F10 | Administração do sistema | |
+| F10 | Administração: contas da equipa, senha temporária obrigatória, auditoria com filtros, cópias de segurança, estado do sistema | ✅ |
 | F11 | Acessibilidade, testes e acabamento | |

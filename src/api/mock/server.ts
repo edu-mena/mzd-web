@@ -14,6 +14,7 @@ import { rotasFinanceiro } from './financeiro';
 import { rotasComunicacoes } from './comunicacoes';
 import { rotasPortal } from './portal';
 import { rotasRelatorios } from './relatorios';
+import { rotasAdministracao } from './administracao';
 import { guardarFicheiro, limparFicheiros, PREFIXO_URL_MOCK } from './ficheiros';
 import { estaAtivo } from '../../types';
 import type { Anexo, Configuracao, FinalidadeAnexo } from '../../types';
@@ -40,6 +41,7 @@ const rotas: [Metodo, string, Handler][] = [
       throw new ApiError(401, 'Email ou palavra-passe incorretos.');
     }
     tentativas.delete(email);
+    u.ultimoAcesso = new Date().toISOString();
     definirSessao(u.id);
     auditar(u.id, 'login', 'sessao');
     guardar();
@@ -69,6 +71,7 @@ const rotas: [Metodo, string, Handler][] = [
   ...rotasComunicacoes,
   ...rotasPortal,
   ...rotasRelatorios,
+  ...rotasAdministracao,
 
   // Configuração
   ['GET', '/configuracao', () => {
@@ -86,11 +89,6 @@ const rotas: [Metodo, string, Handler][] = [
     return nova;
   }],
 
-  // Auditoria
-  ['GET', '/auditoria', () => {
-    exigir('sistema.admin');
-    return db().auditoria;
-  }],
 
   // Apenas no modo simulado
   ['POST', '/demo/repor', () => {
@@ -121,6 +119,11 @@ const latencia = () => new Promise((r) => setTimeout(r, 120 + Math.random() * 18
 export async function handle<T>(method: Metodo, path: string, body?: unknown): Promise<T> {
   await latencia();
   const [caminho, qs] = path.split('?');
+  // Com uma palavra-passe temporária, só se pode mudar a palavra-passe ou sair.
+  const sessao = sessaoAtual();
+  if (sessao && !caminho.startsWith('/auth/') && db().utilizadores.find((x) => x.id === sessao)?.mudarSenha) {
+    throw new ApiError(403, 'Altere a palavra-passe temporária antes de continuar.');
+  }
   for (const [m, padrao, handler] of rotas) {
     if (m !== method) continue;
     const params = corresponder(padrao, caminho);

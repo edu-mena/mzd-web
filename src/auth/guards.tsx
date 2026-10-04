@@ -11,6 +11,8 @@ export function RequireAuth() {
   const location = useLocation();
   if (carregando) return <EcraCarregamento />;
   if (!user) return <Navigate to="/login" replace state={{ de: location.pathname + location.search }} />;
+  // Palavra-passe temporária: nada mais funciona até ser trocada (o servidor também o garante).
+  if (user.mudarSenha && location.pathname !== '/alterar-senha') return <Navigate to="/alterar-senha" replace />;
   return <Outlet />;
 }
 

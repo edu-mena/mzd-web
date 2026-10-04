@@ -5,6 +5,10 @@ import { enviarFicheiro, request } from './client';
 import type {
   Anexo,
   AcessoPortal,
+  CopiaSeguranca,
+  EstadoSistema,
+  PaginaAuditoria,
+  Perfil,
   AlertaPainel,
   Relatorio,
   PortalProcesso,
@@ -17,7 +21,6 @@ import type {
   Cliente,
   ClienteResumo,
   Configuracao,
-  EventoAuditoria,
   FichaRecepcao,
   FinalidadeAnexo,
   FormaPagamento,
@@ -61,6 +64,10 @@ export interface DecisaoPortal {
   /** Motivo da recusa. */
   motivo?: string;
 }
+
+export interface DadosUtilizador { nome: string; email: string; telefone?: string; perfil: Perfil }
+
+export interface FiltrosAuditoria { de?: string; ate?: string; utilizadorId?: string; entidade?: string; q?: string; pagina?: number; tamanho?: number }
 
 export interface NovaMensagem {
   canal: CanalMensagem;
@@ -163,9 +170,14 @@ export const api = {
     login: (email: string, senha: string) => request<Utilizador>('POST', '/auth/login', { email, senha }),
     logout: () => request<void>('POST', '/auth/logout'),
     me: () => request<Utilizador>('GET', '/auth/me'),
+    mudarSenha: (atual: string, nova: string) => request<Utilizador>('POST', '/auth/senha', { atual, nova }),
   },
   utilizadores: {
     listar: () => request<Utilizador[]>('GET', '/utilizadores'),
+    criar: (dados: DadosUtilizador) => request<{ utilizador: Utilizador; senhaTemporaria: string }>('POST', '/utilizadores', dados),
+    editar: (id: string, dados: DadosUtilizador) => request<Utilizador>('PUT', `/utilizadores/${id}`, dados),
+    definirAtivo: (id: string, ativo: boolean) => request<Utilizador>('PATCH', `/utilizadores/${id}/estado`, { ativo }),
+    reporSenha: (id: string) => request<{ senhaTemporaria: string }>('POST', `/utilizadores/${id}/senha`),
   },
   clientes: {
     listar: () => request<ClienteResumo[]>('GET', '/clientes'),
@@ -296,8 +308,17 @@ export const api = {
     guardar: (dados: Configuracao) => request<Configuracao>('PUT', '/configuracao', dados),
   },
   auditoria: {
-    listar: () => request<EventoAuditoria[]>('GET', '/auditoria'),
+    listar: (f: FiltrosAuditoria = {}) =>
+      request<PaginaAuditoria>('GET', `/auditoria${qs({ ...f, pagina: f.pagina ? String(f.pagina) : undefined, tamanho: f.tamanho ? String(f.tamanho) : undefined })}`),
   },
+  sistema: {
+    estado: () => request<EstadoSistema>('GET', '/sistema/estado'),
+    copias: () => request<CopiaSeguranca[]>('GET', '/sistema/copias'),
+    criarCopia: () => request<CopiaSeguranca>('POST', '/sistema/copias'),
+    /** No PHP: descarrega o .sql.gz. Na demonstração: os dados em JSON. */
+    dadosCopia: (id: string) => request<unknown>('GET', `/sistema/copias/${id}/dados`),
+  },
+
   demo: {
     repor: () => request<void>('POST', '/demo/repor'),
   },

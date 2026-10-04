@@ -37,6 +37,10 @@ export type Permissao =
   | 'relatorios.ver'
   | 'equipa.ver'
   | 'definicoes.gerir'
+  /** Criar, editar e desativar contas da equipa (só o administrador mexe em administradores). */
+  | 'utilizadores.gerir'
+  | 'auditoria.ver'
+  /** Cópias de segurança, estado do sistema e operações técnicas. */
   | 'sistema.admin';
 
 export const PERMISSAO_LABEL: Record<Permissao, string> = {
@@ -67,6 +71,8 @@ export const PERMISSAO_LABEL: Record<Permissao, string> = {
   'relatorios.ver': 'Ver relatórios',
   'equipa.ver': 'Ver equipa',
   'definicoes.gerir': 'Gerir definições',
+  'utilizadores.gerir': 'Gerir utilizadores da equipa',
+  'auditoria.ver': 'Consultar a auditoria',
   'sistema.admin': 'Administrar o sistema',
 };
 

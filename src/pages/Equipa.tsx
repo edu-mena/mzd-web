@@ -1,4 +1,7 @@
+import { Link } from 'react-router-dom';
 import { useProcessos, useUtilizadores } from '../api/hooks';
+import { useAuth } from '../auth/useAuth';
+import { botao } from '../components/ui/botao';
 import { Card } from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import { Carregando, ErroCarregamento } from '../components/ui/Estados';
@@ -8,6 +11,7 @@ import type { Perfil } from '../types';
 const ORDEM: Perfil[] = ['direcao', 'chefe_oficina', 'mecanico', 'rececionista', 'administrativa', 'admin'];
 
 export default function Equipa() {
+  const { can } = useAuth();
   const { data: utilizadores, isPending, error, refetch } = useUtilizadores();
   const { data: processos = [] } = useProcessos();
   if (isPending) return <Carregando />;
@@ -17,7 +21,11 @@ export default function Equipa() {
 
   return (
     <div className="pagina space-y-5">
-      <PageHeader titulo="Equipa" descricao={`${utilizadores.filter((u) => u.ativo).length} colaboradores ativos`} />
+      <PageHeader
+        titulo="Equipa"
+        descricao={`${utilizadores.filter((u) => u.ativo).length} colaboradores ativos`}
+        acoes={can('utilizadores.gerir') && <Link to="/administracao" className={botao('secundario')}>Gerir contas</Link>}
+      />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {ordenados.map((u) => {

@@ -1,40 +1,36 @@
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, RotateCcw } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Card, CardHeader } from '../components/ui/Card';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import Tabs from '../components/ui/Tabs';
 import { Field, Input } from '../components/ui/Form';
-import { Table, Th, Tr, Td, LinhaVazia } from '../components/ui/Table';
 import { Carregando, ErroCarregamento } from '../components/ui/Estados';
 import { useToast } from '../components/ui/toast-context';
-import { chaves, trocarSessao, useConfiguracao, useGuardarConfiguracao, useUtilizadores } from '../api/hooks';
-import { api } from '../api/endpoints';
-import { API_MODE } from '../api/client';
+import { useConfiguracao, useGuardarConfiguracao } from '../api/hooks';
 import { useAuth } from '../auth/useAuth';
-import { PERMISSAO_LABEL, PERMISSOES_POR_PERFIL } from '../auth/permissions';
-import type { Permissao } from '../auth/permissions';
-import { PERFIL_LABEL } from '../types';
-import type { Configuracao, Perfil } from '../types';
-import { formatDateTime } from '../lib/format';
+import type { Configuracao } from '../types';
 import { mensagemErro } from '../lib/erros';
 
 export default function Definicoes() {
   const { can } = useAuth();
   return (
     <div className="pagina space-y-5">
-      <PageHeader titulo="Definições" descricao="Dados da empresa, preços-base, utilizadores e permissões" />
+      <PageHeader titulo="Definições" descricao="Dados da empresa, preços-base e regras da oficina" />
       <Tabs
         tabs={[
           { id: 'empresa', label: 'Empresa e preços', content: <EmpresaPrecos /> },
-          { id: 'utilizadores', label: 'Utilizadores e permissões', content: <Utilizadores /> },
           { id: 'modelos', label: 'Modelos de documentos', content: <Modelos /> },
-          ...(can('sistema.admin') ? [{ id: 'sistema', label: 'Sistema', content: <Sistema /> }] : []),
         ]}
       />
+      {can('auditoria.ver') && (
+        <p className="text-xs text-mzd-gray">
+          Utilizadores, permissões, auditoria e cópias de segurança estão em <Link to="/administracao" className="font-semibold text-mzd-black underline-offset-4 hover:underline">Administração</Link>.
+        </p>
+      )}
     </div>
   );
 }
@@ -121,70 +117,6 @@ function FormConfig({ inicial }: { inicial: Configuracao }) {
   );
 }
 
-// ---------- Utilizadores & Permissões ----------
-
-const PERFIS = Object.keys(PERFIL_LABEL) as Perfil[];
-
-function Utilizadores() {
-  const { data: utilizadores, isPending, error, refetch } = useUtilizadores();
-  if (isPending) return <Carregando />;
-  if (error) return <ErroCarregamento erro={error} onRepetir={refetch} />;
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader title="Utilizadores" subtitle="A criação e edição de utilizadores chega com a área de administração" />
-        <Table>
-          <thead>
-            <tr>
-              <Th>Nome</Th>
-              <Th>Email</Th>
-              <Th>Perfil</Th>
-              <Th>Estado</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {utilizadores.map((u) => (
-              <Tr key={u.id}>
-                <Td className="font-semibold text-mzd-black">{u.nome}</Td>
-                <Td className="text-mzd-gray">{u.email}</Td>
-                <Td className="text-mzd-gray">{PERFIL_LABEL[u.perfil]}</Td>
-                <Td><span className={`rotulo ${u.ativo ? '!text-sinal-verde' : ''}`}>{u.ativo ? 'Ativo' : 'Inativo'}</span></Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      </Card>
-
-      <Card>
-        <CardHeader title="Matriz de permissões" subtitle="O que cada perfil pode fazer. O servidor aplica as mesmas regras em cada pedido." />
-        <Table>
-          <thead>
-            <tr>
-              <Th className="sticky left-0 z-10 bg-white">Permissão</Th>
-              {PERFIS.map((p) => <Th key={p} className="text-center">{PERFIL_LABEL[p]}</Th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {(Object.keys(PERMISSAO_LABEL) as Permissao[]).map((perm) => (
-              <Tr key={perm}>
-                <Td className="sticky left-0 bg-white text-mzd-black">{PERMISSAO_LABEL[perm]}</Td>
-                {PERFIS.map((p) => (
-                  <Td key={p} className="text-center">
-                    {PERMISSOES_POR_PERFIL[p].includes(perm)
-                      ? <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-mzd-black" role="img" aria-label="Sim" />
-                      : <span className="inline-block h-2.5 w-2.5 rounded-[2px] border border-zinc-300" role="img" aria-label="Não" />}
-                  </Td>
-                ))}
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      </Card>
-    </div>
-  );
-}
-
 // ---------- Modelos ----------
 
 function Modelos() {
@@ -200,72 +132,5 @@ function Modelos() {
         ))}
       </ol>
     </Card>
-  );
-}
-
-// ---------- Sistema (administrador) ----------
-
-function Sistema() {
-  const toast = useToast();
-  const qc = useQueryClient();
-  const { data: auditoria, isPending, error, refetch } = useQuery({ queryKey: chaves.auditoria, queryFn: api.auditoria.listar });
-  const { data: utilizadores = [] } = useUtilizadores();
-  const nome = (id: string | null) => (id ? utilizadores.find((u) => u.id === id)?.nome ?? id : 'Desconhecido');
-
-  async function reporDemo() {
-    if (!window.confirm('Repor todos os dados de demonstração? Todas as alterações feitas neste navegador serão perdidas e terá de iniciar sessão novamente.')) return;
-    try {
-      await api.demo.repor();
-      trocarSessao(qc, null);
-    } catch (e) {
-      toast(mensagemErro(e), 'erro');
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader title="Registo de auditoria" subtitle="Últimos 50 eventos: entradas, alterações e operações sensíveis" />
-        {isPending ? (
-          <div className="p-5"><Carregando /></div>
-        ) : error ? (
-          <ErroCarregamento erro={error} onRepetir={refetch} />
-        ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Data</Th>
-                <Th>Utilizador</Th>
-                <Th>Ação</Th>
-                <Th>Detalhe</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditoria.slice(0, 50).map((a) => (
-                <Tr key={a.id}>
-                  <Td num className="whitespace-nowrap text-mzd-gray">{formatDateTime(a.data)}</Td>
-                  <Td className="text-mzd-black">{nome(a.utilizadorId)}</Td>
-                  <Td num className={`text-xs ${a.acao === 'login_falhado' ? 'text-sinal-vermelho' : 'text-mzd-black'}`}>
-                    {a.acao} · {a.entidade}{a.entidadeId ? ` ${a.entidadeId}` : ''}
-                  </Td>
-                  <Td className="text-mzd-gray">{a.detalhe ?? '—'}</Td>
-                </Tr>
-              ))}
-              {auditoria.length === 0 && <LinhaVazia colunas={4}>Sem eventos registados.</LinhaVazia>}
-            </tbody>
-          </Table>
-        )}
-      </Card>
-
-      {API_MODE === 'mock' && (
-        <Card>
-          <CardHeader title="Dados de demonstração" subtitle="Disponível apenas no modo de demonstração (sem servidor)" />
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-            <p className="text-sm text-mzd-gray">Repõe clientes, viaturas e processos de exemplo e termina a sessão.</p>
-            <Button variante="secundario" icone={<RotateCcw size={14} />} onClick={reporDemo}>Repor dados</Button>
-          </div>
-        </Card>
-      )}
-    </div>
   );
 }

@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE?: string;
 }
 
+declare const __BUILD__: string;
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }

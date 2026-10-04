@@ -12,6 +12,7 @@ import type {
   ModeloMensagem,
   Perfil,
   ProcessoDetalhado,
+  CopiaSeguranca,
   Tarefa,
   Cliente,
   Configuracao,
@@ -42,7 +43,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 11;
+export const VERSAO_DB = 12;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -65,11 +66,12 @@ export interface MockDB {
   modelos: ModeloMensagem[];
   mensagens: Mensagem[];
   notificacoes: NotificacaoInterna[];
+  copias: CopiaSeguranca[];
   sequencias: {
     processo: number; fatura: number; peca: number; auditoria: number; pagamento: number;
     cliente: number; viatura: number; tarefa: number; tempo: number; adicional: number; anexo: number; marcacao: number;
     fornecedor: number; movimento: number; encomenda: number; recibo: number; fecho: number;
-    mensagem: number; notificacao: number;
+    mensagem: number; notificacao: number; utilizador: number; copia: number;
   };
 }
 
@@ -110,6 +112,7 @@ export function criarSeed(): MockDB {
       avatarIniciais: u.nome.split(' ').map((p) => p[0]).slice(0, 2).join(''),
       ativo: true,
       senha: SENHA_DEMO,
+      criadoEm: '2025-09-01T09:00:00.000Z',
     };
   });
 
@@ -604,6 +607,15 @@ export function criarSeed(): MockDB {
   }
   notificacoes.sort((a, b) => b.data.localeCompare(a.data)).forEach((n, i, l) => { n.id = `nt${l.length - i}`; });
 
+  // ---------- Administração: últimos acessos e cópias automáticas (Cron às 03:00) ----------
+  utilizadores.forEach((u, i) => { u.ultimoAcesso = new Date(agora - (i * 7 + 2) * 3600000).toISOString(); });
+  const copias: CopiaSeguranca[] = Array.from({ length: 7 }, (_, k) => {
+    const d = new Date(agora - k * 86400000);
+    d.setHours(3, 0, 0, 0);
+    if (d.getTime() > agora) d.setDate(d.getDate() - 1);
+    return { id: `cp${7 - k}`, data: d.toISOString(), tipo: 'automatica' as const, tamanhoBytes: 1_840_000 - k * 9_000, ficheiros: 0 };
+  });
+
   // ---------- Stock: inventário inicial e encomendas ----------
   const movimentos: MovimentoStock[] = pecas.map((pc, i) => ({
     id: `mv${i + 1}`, pecaId: pc.id, tipo: 'acerto', quantidade: pc.stock, stockApos: pc.stock,
@@ -642,13 +654,14 @@ export function criarSeed(): MockDB {
     modelos,
     mensagens,
     notificacoes,
+    copias,
     anexos: [],
     sequencias: {
       processo: 1000 + processos.length, fatura: 2000 + processos.length, peca: pecas.length, auditoria: 0, pagamento: seqPagamento,
       cliente: clientes.length, viatura: viaturas.length, tarefa: seqTarefa, tempo: seqTempo, adicional: 0, anexo: 0, marcacao: marcacoes.length,
       fornecedor: fornecedores.length, movimento: movimentos.length, encomenda: encomendas.length,
       recibo: todosPagamentos.length, fecho: fechos.length,
-      mensagem: mensagens.length, notificacao: notificacoes.length,
+      mensagem: mensagens.length, notificacao: notificacoes.length, utilizador: utilizadores.length, copia: copias.length,
     },
   };
 }

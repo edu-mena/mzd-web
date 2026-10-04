@@ -1,4 +1,4 @@
-import { Search, ChevronDown, Menu, LogOut } from 'lucide-react';
+import { Search, ChevronDown, Menu, LogOut, KeyRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_MODE } from '../../api/client';
@@ -87,6 +87,13 @@ export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
                 <p className="text-sm font-semibold text-mzd-black">{user.nome}</p>
                 <p className="truncate text-xs text-mzd-gray">{user.email}</p>
               </div>
+              <button
+                role="menuitem"
+                onMouseDown={() => navigate('/alterar-senha')}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-mzd-black hover:bg-zinc-50"
+              >
+                <KeyRound size={15} /> Alterar palavra-passe
+              </button>
               <button
                 role="menuitem"
                 onMouseDown={async () => { await logout(); navigate('/login', { replace: true }); }}
