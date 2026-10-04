@@ -106,7 +106,7 @@ disponível em `/site`. Foco em Mitsubishi: modelos interativos, serviços, como
   e o título/descrição para o Google.
 - **Pedidos:** o formulário cria um pedido (`POST /site/pedidos`, público, com campo-armadilha e limite por
   número); a receção trata-os em Comunicações → Pedidos do site (ligar, WhatsApp, marcar dia, arquivar).
-- **Fotografias:** licença livre do Wikimedia Commons, guardadas em `public/site/`, com autor e licença em
+- **Fotografias:** licença livre do Wikimedia Commons, guardadas em `public/imagens/site/` (não em `public/site/`, que colidiria com o endereço `/site`), com autor e licença em
   "Créditos das fotografias" ([src/lib/site.ts](src/lib/site.ts)). A imagem principal foi retocada (pessoa removida).
 - **Marca:** a MZD apresenta-se como oficina independente; não se usa o logótipo da Mitsubishi.
 - **SEO:** o site é indexável; a área reservada, o login e o portal do cliente não (`robots.txt` + `noindex`).

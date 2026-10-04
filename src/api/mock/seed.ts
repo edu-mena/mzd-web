@@ -46,7 +46,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 14;
+export const VERSAO_DB = 15;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };

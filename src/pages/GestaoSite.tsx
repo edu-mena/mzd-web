@@ -18,7 +18,7 @@ import { formatDateTime } from '../lib/format';
 import { Imagem } from './site/Partes';
 
 const novoId = () => `i${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const IMAGEM_VAZIA: ImagemSite = { url: '/site/galeria-oficina.jpg', alt: 'Fotografia da oficina' };
+const IMAGEM_VAZIA: ImagemSite = { url: '/imagens/site/galeria-oficina.jpg', alt: 'Fotografia da oficina' };
 
 /** Edição do site público pelo administrador do sistema. */
 export default function GestaoSite() {

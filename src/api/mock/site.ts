@@ -21,7 +21,7 @@ const recentes = new Map<string, number[]>();
 
 const imagem = (v: any, campo: string) => {
   const url = texto(v?.url, `${campo}: imagem`, 1, 300);
-  if (!/^(\/site\/|\/media\/site\/|mock-anexo:)/.test(url)) throw new ApiError(422, `${campo}: imagem inválida.`);
+  if (!/^(\/imagens\/site\/|\/media\/site\/|mock-anexo:)/.test(url)) throw new ApiError(422, `${campo}: imagem inválida.`);
   return { url, alt: texto(v?.alt, `${campo}: descrição da imagem`, 3, 160), credito: v?.credito ? String(v.credito).slice(0, 200) : undefined };
 };
 const lista = <T,>(v: unknown, campo: string, max: number, f: (x: any, i: number) => T): T[] => {
