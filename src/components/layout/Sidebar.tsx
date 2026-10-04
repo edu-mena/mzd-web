@@ -102,7 +102,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
           <NavSection items={visiveis(primary)} compact={compact} contadores={contadores} onNavigate={onClose} />
           {gestao.length > 0 && (
             <>
-              {!compact && <p className="rotulo mb-1.5 mt-6 px-3 !text-zinc-500">Gestão</p>}
+              {!compact && <p className="rotulo mb-1.5 mt-6 px-3 !text-zinc-400">Gestão</p>}
               {compact && <div className="my-3 border-t border-white/10" />}
               <NavSection items={gestao} compact={compact} onNavigate={onClose} />
             </>

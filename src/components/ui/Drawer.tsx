@@ -42,7 +42,7 @@ export default function Drawer({
         onClick={(e) => e.stopPropagation()}
         className={`flex h-[100dvh] w-full ${largura === 'lg' ? 'md:max-w-3xl' : 'md:max-w-xl'} flex-col border-l border-linha bg-papel shadow-flutuante outline-none [animation:entrada-lado_0.28s_cubic-bezier(0.2,0.7,0.2,1)_both]`}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-linha bg-superficie px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-linha bg-superficie px-5 py-4">
           <div className="min-w-0">
             <h2 id={tituloId} className="text-lg font-extrabold text-mzd-black">{titulo}</h2>
             {subtitulo && <div className="mt-0.5 text-[13px] text-mzd-gray">{subtitulo}</div>}
@@ -50,12 +50,12 @@ export default function Drawer({
           <button onClick={onClose} className="shrink-0 rounded-md p-1.5 text-mzd-gray hover:bg-zinc-100 hover:text-mzd-black" aria-label="Fechar">
             <X size={18} />
           </button>
-        </header>
+        </div>
         <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
         {rodape && (
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-linha bg-superficie px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-linha bg-superficie px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {rodape}
-          </footer>
+          </div>
         )}
       </div>
     </div>,

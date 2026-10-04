@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ErroAplicacao from './components/ErroAplicacao';
 import AppLayout from './components/layout/AppLayout';
 import { ToastProvider } from './components/ui/Toast';
 import AuthProvider from './auth/AuthProvider';
@@ -38,6 +39,7 @@ const protegida = (permissao: Permissao, pagina: ReactNode) => (
 
 export default function App() {
   return (
+    <ErroAplicacao>
     <ToastProvider>
       <AuthProvider>
         <BrowserRouter>
@@ -75,5 +77,6 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </ToastProvider>
+    </ErroAplicacao>
   );
 }

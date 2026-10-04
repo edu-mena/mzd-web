@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -9,6 +10,7 @@ export default function PageHeader({
   voltar,
   acoes,
   extra,
+  tituloDocumento,
 }: {
   titulo: ReactNode;
   descricao?: ReactNode;
@@ -16,7 +18,13 @@ export default function PageHeader({
   acoes?: ReactNode;
   /** Conteúdo junto ao título (ex.: estado do processo). */
   extra?: ReactNode;
+  /** Título do separador do navegador, quando `titulo` não é texto simples. */
+  tituloDocumento?: string;
 }) {
+  const doc = tituloDocumento ?? (typeof titulo === 'string' ? titulo : undefined);
+  useEffect(() => {
+    if (doc) document.title = `${doc} · MZD`;
+  }, [doc]);
   return (
     <header className="no-print">
       {voltar && (

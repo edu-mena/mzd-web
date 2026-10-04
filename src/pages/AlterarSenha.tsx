@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Eye, EyeOff, X } from 'lucide-react';
@@ -29,6 +29,7 @@ export default function AlterarSenha() {
   const [ver, setVer] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
+  useEffect(() => { document.title = 'Palavra-passe · MZD'; }, []);
   const obrigatoria = !!user?.mudarSenha;
   const regras = regrasSenha(nova, { email: user?.email, nome: user?.nome });
   const iguais = nova.length > 0 && nova === confirmar;

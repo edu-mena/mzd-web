@@ -38,7 +38,7 @@ export function Indicador({ label, valor, formato, melhor = 'mais', nota }: {
         {!neutro && <Seta size={13} strokeWidth={2.25} aria-hidden />}
         <span>{texto}</span>
       </p>
-      <p className="num mt-0.5 text-[11px] text-zinc-400" title="Período anterior de igual duração">antes: {mostrar(anterior)}</p>
+      <p className="num mt-0.5 text-[11px] text-mzd-gray" title="Período anterior de igual duração">antes: {mostrar(anterior)}</p>
       {nota && <p className="mt-1 text-[11px] text-mzd-gray">{nota}</p>}
     </div>
   );
@@ -56,7 +56,7 @@ export function Bloco({ titulo, subtitulo, onExportar, children, className }: {
     <section className={clsx('rounded-lg border border-linha bg-superficie', className)}>
       <div className="flex items-start justify-between gap-3 border-b border-linha px-5 py-3.5">
         <div className="min-w-0">
-          <h3 className="text-[13px] font-bold text-mzd-black">{titulo}</h3>
+          <h2 className="text-[13px] font-bold text-mzd-black">{titulo}</h2>
           {subtitulo && <p className="mt-0.5 text-xs text-mzd-gray">{subtitulo}</p>}
         </div>
         {onExportar && <Button variante="fantasma" tamanho="sm" icone={<Download size={13} />} onClick={onExportar}>CSV</Button>}

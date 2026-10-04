@@ -93,7 +93,17 @@ Enquanto não houver backend, o site publicado corre em modo de demonstração. 
 variável de ambiente `VITE_API_MODE=http` na configuração de build da Hostinger.
 
 O [public/.htaccess](public/.htaccess) encaminha as rotas da aplicação, deixa `/api` para o PHP, bloqueia
-ficheiros ocultos e de configuração e define cabeçalhos de segurança (incluindo HSTS) e de cache. O HTTPS está ativo e forçado no hPanel.
+ficheiros ocultos e de configuração e define cabeçalhos de segurança (HSTS e Content-Security-Policy: só scripts do próprio site) e de cache. O HTTPS está ativo e forçado no hPanel.
+
+## Acessibilidade
+
+- Todas as páginas (computador e telemóvel), por perfil, e as janelas principais passam a auditoria axe-core
+  (WCAG 2.1 A/AA e boas práticas) sem falhas. Textos secundários usam `text-mzd-gray` (≥ 4,5:1); `zinc-400` só
+  sobre fundo escuro ou em elementos decorativos.
+- Teclado: "Saltar para o conteúdo", foco no conteúdo ao mudar de página, diálogos com o foco preso e devolvido
+  a quem os abriu, menus com setas e Esc. Cada página define o título do separador.
+- Um erro numa página mostra uma mensagem útil (e não um ecrã branco); se for uma versão nova publicada
+  entretanto, a página recarrega sozinha.
 
 ## Plano
 
@@ -110,4 +120,4 @@ ficheiros ocultos e de configuração e define cabeçalhos de segurança (inclui
 | F8 | Portal do cliente: link pessoal, percurso, orçamento e aprovação online, levantamento | ✅ |
 | F9 | Painéis por função, alertas "pede atenção", relatórios por período com comparação e CSV | ✅ |
 | F10 | Administração: contas da equipa, senha temporária obrigatória, auditoria com filtros, cópias de segurança, estado do sistema | ✅ |
-| F11 | Acessibilidade, testes e acabamento | |
+| F11 | Acabamento: WCAG 2.1 AA sem falhas (axe), teclado e foco, títulos, rede de segurança para erros, CSP, Ajuda por função | ✅ |

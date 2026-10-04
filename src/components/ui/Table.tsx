@@ -1,23 +1,27 @@
+import RegiaoRolavel from './RegiaoRolavel';
 import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import clsx from 'clsx';
 
 /** Tabela densa com cabeçalho em rótulos e linhas finas; desliza na horizontal em ecrãs pequenos. */
 export function Table({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={clsx('overflow-x-auto', className)}>
+    <RegiaoRolavel className={className}>
       <table className="w-full border-collapse text-[13px]">{children}</table>
-    </div>
+    </RegiaoRolavel>
   );
 }
 
 /** Cabeçalho de coluna. `scope="col"` garante que os leitores de ecrã o anunciam como cabeçalho. */
-export function Th({ className, direita, ...props }: ThHTMLAttributes<HTMLTableCellElement> & { direita?: boolean }) {
+export function Th({ className, direita, children, ...props }: ThHTMLAttributes<HTMLTableCellElement> & { direita?: boolean }) {
   return (
     <th
       scope="col"
-      className={clsx('rotulo whitespace-nowrap border-b border-linha bg-zinc-50/60 px-4 py-2 font-bold', direita ? 'text-right' : 'text-left', className)}
+      className={clsx('rotulo relative whitespace-nowrap border-b border-linha bg-zinc-50/60 px-4 py-2 font-bold', direita ? 'text-right' : 'text-left', className)}
       {...props}
-    />
+    >
+      {/* Coluna de botões sem título visível: os leitores de ecrã ouvem "Ações". */}
+      {children ?? <span className="sr-only">Ações</span>}
+    </th>
   );
 }
 

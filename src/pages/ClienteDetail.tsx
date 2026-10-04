@@ -138,8 +138,8 @@ export default function ClienteDetail() {
                   <Td num className="text-mzd-gray">{formatDate(m.data)}</Td>
                   <Td className={m.tipo === 'anulacao' ? 'text-sinal-vermelho' : ''}><span className="num">{m.documento}</span></Td>
                   <Td><Link to={`/processos/${m.processoId}`} className="num text-mzd-gray underline-offset-4 hover:underline">{m.processoNumero}</Link></Td>
-                  <Td direita>{m.debito ? <Kz valor={m.debito} /> : <span className="text-zinc-300">—</span>}</Td>
-                  <Td direita>{m.credito ? <Kz valor={m.credito} className="text-sinal-verde" /> : <span className="text-zinc-300">—</span>}</Td>
+                  <Td direita>{m.debito ? <Kz valor={m.debito} /> : <span className="text-mzd-gray">—</span>}</Td>
+                  <Td direita>{m.credito ? <Kz valor={m.credito} className="text-sinal-verde" /> : <span className="text-mzd-gray">—</span>}</Td>
                   <Td direita><Kz valor={m.saldo} className="font-semibold" /></Td>
                 </Tr>
               ))}

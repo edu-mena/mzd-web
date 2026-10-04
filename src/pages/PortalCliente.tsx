@@ -111,7 +111,7 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
             <p className="num text-xs text-mzd-gray">Processo {p.numero}</p>
           </div>
         </div>
-        <p className={clsx('rotulo mt-5', porDecidir ? '!text-mzd-red' : p.estado === 'pronta_entrega' ? '!text-sinal-verde' : '')}>{ESTADO_CLIENTE[p.estado]}</p>
+        <p className={clsx('rotulo mt-5', porDecidir ? '!text-sinal-vermelho' : p.estado === 'pronta_entrega' ? '!text-sinal-verde' : '')}>{ESTADO_CLIENTE[p.estado]}</p>
         <h1 className="mt-1 font-display text-[1.75rem] font-extrabold leading-[1.1] text-mzd-black">{frase.titulo}</h1>
         {frase.texto && <p className="mt-2 text-[15px] text-mzd-graphite">{frase.texto}</p>}
         {ativo && p.estado !== 'pronta_entrega' && (
@@ -208,7 +208,7 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
                   {passou && !atual && <Check size={9} strokeWidth={3.5} className="absolute inset-0 m-auto text-white" />}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3">
-                  <span className={clsx('text-[13.5px]', atual ? 'font-bold text-mzd-black' : futura ? 'text-zinc-400' : 'text-mzd-black')}>{ESTADO_CLIENTE[e]}</span>
+                  <span className={clsx('text-[13.5px]', atual ? 'font-bold text-mzd-black' : futura ? 'text-mzd-gray' : 'text-mzd-black')}>{ESTADO_CLIENTE[e]}</span>
                   {passou && <span className="num text-[11.5px] text-mzd-gray">{formatDateTime(passou.data)}</span>}
                 </span>
               </li>

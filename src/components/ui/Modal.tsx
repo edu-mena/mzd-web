@@ -37,7 +37,7 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-linha px-5 py-3.5">
-          <h3 id={tituloId} className="text-[15px] font-bold text-mzd-black">{title}</h3>
+          <h2 id={tituloId} className="text-[15px] font-bold text-mzd-black">{title}</h2>
           <button onClick={onClose} className="rounded-lg p-1 text-mzd-gray hover:bg-zinc-100 hover:text-mzd-black" aria-label="Fechar">
             <X size={18} />
           </button>

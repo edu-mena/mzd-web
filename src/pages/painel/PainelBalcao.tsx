@@ -68,7 +68,7 @@ export default function PainelBalcao() {
                     return (
                       <li key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-3">
                         <span className="num w-12 text-[13px] font-semibold text-mzd-black">{horaCurta(m.data)}</span>
-                        {m.matricula ? <Matricula valor={m.matricula} tamanho="sm" /> : <span className="w-[86px] text-xs text-zinc-400">sem matrícula</span>}
+                        {m.matricula ? <Matricula valor={m.matricula} tamanho="sm" /> : <span className="w-[86px] text-xs text-mzd-gray">sem matrícula</span>}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] font-semibold text-mzd-black">{m.nome}</span>
                           <span className="block text-xs text-mzd-gray">{TIPO_MARCACAO_LABEL[m.tipo]} · {ESTADO_MARCACAO_LABEL[m.estado]}</span>

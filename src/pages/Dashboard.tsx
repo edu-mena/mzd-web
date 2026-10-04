@@ -153,7 +153,7 @@ function PainelGestao() {
                   <p className="mt-0.5 text-[12.5px] font-semibold leading-tight text-mzd-black">{ESTADO_LABEL[e.estado]}</p>
                 </div>
                 <div>
-                  <p className={clsx('font-display text-[32px] font-extrabold leading-none tabular-nums [font-stretch:100%]', e.total === 0 && 'text-zinc-300')}>
+                  <p className={clsx('font-display text-[32px] font-extrabold leading-none tabular-nums [font-stretch:100%]', e.total === 0 && 'text-mzd-gray')}>
                     {e.total}
                   </p>
                   <div className="mt-2.5 flex h-[5px] gap-[2px]" aria-hidden>
@@ -254,11 +254,14 @@ function PainelGestao() {
                 <dt className="rotulo">Valor médio por fatura</dt>
                 <dd className="mt-1 text-xl font-semibold"><Kz valor={ind.ticketMedio} /></dd>
               </div>
-              <Link to="/faturacao" className="group px-5 py-4 hover:bg-zinc-50">
+              {/* A ligação cobre o bloco todo (after:inset-0) sem quebrar a estrutura da lista. */}
+              <div className="group relative px-5 py-4 hover:bg-zinc-50">
                 <dt className="rotulo">Por receber</dt>
                 <dd className="mt-1 text-xl font-semibold text-sinal-vermelho"><Kz valor={ind.pendente} /></dd>
-                <dd className="mt-0.5 text-xs text-mzd-gray group-hover:underline">{ind.comSaldo} fatura(s) com saldo em aberto</dd>
-              </Link>
+                <dd className="mt-0.5 text-xs text-mzd-gray">
+                  <Link to="/faturacao" className="after:absolute after:inset-0 group-hover:underline">{ind.comSaldo} fatura(s) com saldo em aberto</Link>
+                </dd>
+              </div>
             </dl>
           </Card>
         </div>

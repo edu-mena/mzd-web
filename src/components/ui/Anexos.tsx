@@ -76,6 +76,8 @@ export function SeletorFicheiros({
         multiple
         className="sr-only"
         tabIndex={-1}
+        aria-hidden
+        aria-label="Escolher fotografias ou vídeos"
         onChange={(e) => escolher(e.target.files)}
       />
       <button

@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
+// Últimos elementos focados: um campo com autofoco dentro do diálogo apanha o foco antes de o diálogo
+// saber quem o abriu, por isso guarda-se um pequeno histórico para devolver o foco ao sítio certo.
+const historico: HTMLElement[] = [];
+if (typeof document !== 'undefined') {
+  document.addEventListener('focusin', (e) => {
+    if (!(e.target instanceof HTMLElement)) return;
+    historico.unshift(e.target);
+    historico.length = Math.min(historico.length, 8);
+  });
+}
+
 const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -15,11 +26,13 @@ export function useDialogo(open: boolean, onClose: () => void, caixa: RefObject<
 
   useEffect(() => {
     if (!open) return;
-    const anterior = document.activeElement as HTMLElement | null;
+    const el = caixa.current;
+    const anterior = el?.contains(document.activeElement)
+      ? historico.find((x) => x.isConnected && !el.contains(x)) ?? null
+      : (document.activeElement as HTMLElement | null);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const el = caixa.current;
     if (el && !el.contains(document.activeElement)) {
       (el.querySelector<HTMLElement>('[autofocus], input, select, textarea') ?? el).focus();
     }

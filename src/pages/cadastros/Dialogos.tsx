@@ -38,7 +38,7 @@ function EscolherCliente({ excluir, escolhido, onEscolher }: { excluir: string[]
               className={clsx('flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-[13px]', escolhido?.id === c.id ? 'border-mzd-black bg-mzd-black text-white' : 'border-linha bg-white hover:border-zinc-400')}
             >
               <span className="font-semibold">{c.nome}</span>
-              <span className={clsx('num text-xs', escolhido?.id === c.id ? 'text-zinc-300' : 'text-mzd-gray')}>{c.telefone}</span>
+              <span className={clsx('num text-xs', escolhido?.id === c.id ? 'text-mzd-gray' : 'text-mzd-gray')}>{c.telefone}</span>
             </button>
           </li>
         ))}

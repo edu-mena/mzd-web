@@ -46,7 +46,7 @@ export default function Modelos() {
           <Card key={m.chave} className="flex flex-col">
             <div className="flex items-start justify-between gap-3 border-b border-linha px-5 py-3">
               <div className="min-w-0">
-                <h3 className="text-[13.5px] font-bold text-mzd-black">{m.nome}</h3>
+                <h2 className="text-[13.5px] font-bold text-mzd-black">{m.nome}</h2>
                 <p className="text-xs text-mzd-gray">{m.descricao}</p>
               </div>
               {editar && <Button variante="fantasma" tamanho="sm" icone={<Pencil size={13} />} onClick={() => setAberto(m)}>Editar</Button>}

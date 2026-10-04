@@ -16,6 +16,7 @@ import RegistarResposta from '../components/comunicacoes/RegistarResposta';
 import LinkPortal from '../components/comunicacoes/LinkPortal';
 import type { ProcessoDetalhado } from '../types';
 import { Card, CardHeader } from '../components/ui/Card';
+import RegiaoRolavel from '../components/ui/RegiaoRolavel';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -88,6 +89,7 @@ export default function ProcessoDetail() {
     <div className="pagina space-y-5">
       <PageHeader
         voltar={{ to: '/processos', label: 'Processos' }}
+        tituloDocumento={`${viatura.matricula} · ${processo.numero}`}
         titulo={
           <span className="flex flex-wrap items-center gap-3">
             <Matricula valor={viatura.matricula} tamanho="lg" />
@@ -181,7 +183,8 @@ function ProgressoEtapas({ processo, atrasado }: { processo: ProcessoDetalhado; 
   const tom = TOM_ESTADO[processo.estado];
 
   return (
-    <Card className="no-print overflow-x-auto">
+    <Card className="no-print">
+      <RegiaoRolavel rotulo="Etapas do processo (deslize para ver todas)">
       <ol className="grid min-w-[760px] grid-cols-8">
         {ESTADOS_ORDEM.map((estado, i) => {
           const feito = i < idx || (processo.estado === 'entregue' && i === idx);
@@ -202,7 +205,7 @@ function ProgressoEtapas({ processo, atrasado }: { processo: ProcessoDetalhado; 
                 )}
               />
               <p className="num mt-2 text-[10.5px] text-mzd-gray">{String(i + 1).padStart(2, '0')}</p>
-              <p className={clsx('text-[12px] font-semibold leading-tight', feito || atual ? 'text-mzd-black' : 'text-zinc-400')}>{ESTADO_LABEL[estado]}</p>
+              <p className={clsx('text-[12px] font-semibold leading-tight', feito || atual ? 'text-mzd-black' : 'text-mzd-gray')}>{ESTADO_LABEL[estado]}</p>
               <p className="num mt-0.5 h-4 text-[10.5px] text-mzd-gray">
                 {feito && data ? formatDate(data).slice(0, 5) : atual && !cancelado ? 'atual' : ''}
               </p>
@@ -210,6 +213,7 @@ function ProgressoEtapas({ processo, atrasado }: { processo: ProcessoDetalhado; 
           );
         })}
       </ol>
+      </RegiaoRolavel>
     </Card>
   );
 }

@@ -34,7 +34,7 @@ export default function LinkPortal({ processo }: { processo: ProcessoDetalhado }
     <Card className="px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-[13px] font-bold text-mzd-black">Acompanhamento online do cliente</h3>
+          <h2 className="text-[13px] font-bold text-mzd-black">Acompanhamento online do cliente</h2>
           <p className="mt-0.5 text-xs text-mzd-gray">
             O cliente vê o percurso da viatura e aprova orçamentos neste link, sem conta. Vai nas mensagens com {'{link}'}.
           </p>

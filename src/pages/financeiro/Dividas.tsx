@@ -57,7 +57,7 @@ export default function Dividas() {
                     ))}
                   </Td>
                   {d.escaloes.map((v, i) => (
-                    <Td key={i} direita className={v === 0 ? 'text-zinc-300' : i >= 2 ? 'font-semibold text-sinal-vermelho' : ''}>{v === 0 ? '—' : <Kz valor={v} />}</Td>
+                    <Td key={i} direita className={v === 0 ? 'text-mzd-gray' : i >= 2 ? 'font-semibold text-sinal-vermelho' : ''}>{v === 0 ? '—' : <Kz valor={v} />}</Td>
                   ))}
                   <Td direita><Kz valor={d.total} className="font-semibold" /></Td>
                   <Td direita>

@@ -219,7 +219,7 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
           <li key={nome} aria-current={i === passo ? 'step' : undefined}>
             <span className={clsx('block h-[5px] rounded-[1px]', i < passo ? 'bg-mzd-black' : i === passo ? 'bg-mzd-red' : 'bg-zinc-200')} />
             <span className="num mt-1.5 block text-[10.5px] text-mzd-gray">{String(i + 1).padStart(2, '0')}</span>
-            <span className={clsx('hidden text-[12.5px] font-semibold sm:block', i <= passo ? 'text-mzd-black' : 'text-zinc-400')}>{nome}</span>
+            <span className={clsx('hidden text-[12.5px] font-semibold sm:block', i <= passo ? 'text-mzd-black' : 'text-mzd-gray')}>{nome}</span>
           </li>
         ))}
       </ol>

@@ -70,7 +70,7 @@ export default function Auditoria() {
                   <Td>
                     <span className={clsx('font-medium', ACOES_SENSIVEIS.has(a.acao) ? 'text-sinal-vermelho' : 'text-mzd-black')}>{acaoLegivel(a.acao)}</span>
                     <span className="text-mzd-gray"> · {entidadeLegivel(a.entidade)}</span>
-                    {a.entidadeId && <span className="num ml-1 text-xs text-zinc-400">{a.entidadeId}</span>}
+                    {a.entidadeId && <span className="num ml-1 text-xs text-mzd-gray">{a.entidadeId}</span>}
                   </Td>
                   <Td className="text-mzd-gray">{a.detalhe ?? '—'}</Td>
                 </Tr>

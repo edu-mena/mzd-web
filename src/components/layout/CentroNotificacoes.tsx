@@ -76,7 +76,7 @@ export default function CentroNotificacoes() {
                     <span className="min-w-0 flex-1">
                       <span className={clsx('block text-[13px] text-mzd-black', !n.lida && 'font-semibold')}>{n.titulo}</span>
                       <span className="block truncate text-xs text-mzd-gray">{n.texto}</span>
-                      <span className="num mt-0.5 block text-[11px] text-zinc-400">{haQuanto(n.data, agora)}</span>
+                      <span className="num mt-0.5 block text-[11px] text-mzd-gray">{haQuanto(n.data, agora)}</span>
                     </span>
                   </button>
                 </li>

@@ -120,8 +120,8 @@ function TabPecas() {
                 <Td className="text-mzd-gray">{p.fornecedor}</Td>
                 <Td><NivelStock peca={p} /></Td>
                 <Td direita num>{p.stock}</Td>
-                <Td direita num className={p.reservado ? 'text-mzd-black' : 'text-zinc-400'}>{p.reservado}</Td>
-                {gerir && <Td direita num className={p.encomendado ? 'text-sinal-ambar' : 'text-zinc-400'}>{p.encomendado}</Td>}
+                <Td direita num className={p.reservado ? 'text-mzd-black' : 'text-mzd-gray'}>{p.reservado}</Td>
+                {gerir && <Td direita num className={p.encomendado ? 'text-sinal-ambar' : 'text-mzd-gray'}>{p.encomendado}</Td>}
                 {gerir && <Td direita><Kz valor={p.precoCusto} className="text-mzd-gray" /></Td>}
                 {verValores && <Td direita><Kz valor={p.precoBase} /></Td>}
                 {gerir && <Td direita num className={margem(p.precoCusto, p.precoBase) < 20 ? 'font-semibold text-sinal-ambar' : 'text-mzd-gray'}>{margem(p.precoCusto, p.precoBase)}%</Td>}

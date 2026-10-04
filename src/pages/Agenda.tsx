@@ -18,9 +18,10 @@ import DetalheMarcacao from './agenda/DetalheMarcacao';
 const ESTILO_MARCACAO: Record<Marcacao['estado'], string> = {
   agendada: 'border-linha-forte border-dashed bg-white',
   confirmada: 'border-linha border-l-[3px] border-l-mzd-black bg-white',
-  chegou: 'border-linha bg-zinc-50 opacity-70',
+  // Esbatido com cor (não com transparência, que tirava contraste ao texto).
+  chegou: 'border-dashed border-linha-forte bg-zinc-50 [&_*]:!text-mzd-gray',
   faltou: 'border-linha bg-sinal-vermelho-fundo/50 line-through decoration-zinc-400',
-  cancelada: 'border-linha bg-zinc-50 text-mzd-gray line-through decoration-zinc-400 opacity-60',
+  cancelada: 'border-dashed border-linha-forte bg-zinc-50 line-through decoration-zinc-400 [&_*]:!text-mzd-gray',
 };
 
 export default function Agenda() {
@@ -111,7 +112,7 @@ export default function Agenda() {
                 <div className="flex items-end justify-between">
                   <div>
                     <p className={clsx('rotulo', ehHoje && '!text-sinal-vermelho')}>{d.toLocaleDateString('pt-PT', { weekday: 'short' }).replace('.', '')}{ehHoje && ' · hoje'}</p>
-                    <p className={clsx('font-display text-2xl font-extrabold leading-none tabular-nums [font-stretch:100%]', passado && !ehHoje ? 'text-zinc-400' : 'text-mzd-black')}>{d.getDate()}</p>
+                    <p className={clsx('font-display text-2xl font-extrabold leading-none tabular-nums [font-stretch:100%]', passado && !ehHoje ? 'text-mzd-gray' : 'text-mzd-black')}>{d.getDate()}</p>
                   </div>
                   {!domingo && <span className={clsx('num text-[11px]', ocupadas >= capacidade ? 'font-semibold text-sinal-vermelho' : 'text-mzd-gray')}>{ocupadas}/{capacidade}</span>}
                 </div>
@@ -126,7 +127,7 @@ export default function Agenda() {
 
               <div className="flex-1 space-y-1.5 px-2 pb-2">
                 {domingo ? (
-                  <p className="py-6 text-center text-[11.5px] text-zinc-400">Fechado</p>
+                  <p className="py-6 text-center text-[11.5px] text-mzd-gray">Fechado</p>
                 ) : (
                   <>
                     {lista.map((m) => (
@@ -150,7 +151,7 @@ export default function Agenda() {
                       <button
                         type="button"
                         onClick={() => setNovaNoDia(k)}
-                        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent py-1.5 text-[11px] text-zinc-400 transition-colors hover:border-linha-forte hover:text-mzd-black"
+                        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-transparent py-1.5 text-[11px] text-mzd-gray transition-colors hover:border-linha-forte hover:text-mzd-black"
                         aria-label={`Nova marcação em ${d.toLocaleDateString('pt-PT')}`}
                       >
                         <Plus size={12} /> Marcar
@@ -168,7 +169,7 @@ export default function Agenda() {
                         <Link
                           key={p.id}
                           to={`/processos/${p.id}`}
-                          className={clsx('mb-1 flex items-center gap-1.5 rounded px-1 py-1 hover:bg-zinc-50', !estaAtivo(p.estado) && 'opacity-50')}
+                          className={clsx('mb-1 flex items-center gap-1.5 rounded px-1 py-1 hover:bg-zinc-50', !estaAtivo(p.estado) && '[&_*]:!text-mzd-gray')}
                           title={`${p.cliente.nome} · ${p.numero}`}
                         >
                           <Matricula valor={p.viatura.matricula} tamanho="sm" />

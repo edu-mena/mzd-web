@@ -14,7 +14,7 @@ export function CardHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="flex items-start justify-between gap-3 border-b border-linha px-5 py-3.5">
       <div className="min-w-0">
-        <h3 className="text-[13px] font-bold text-mzd-black">{title}</h3>
+        <h2 className="text-[13px] font-bold text-mzd-black">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-mzd-gray">{subtitle}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,6 +37,7 @@ export default function Login() {
   const destino = (location.state as { de?: string } | null)?.de ?? '/';
   const [erro, setErro] = useState<string | null>(null);
   const [verSenha, setVerSenha] = useState(false);
+  useEffect(() => { document.title = 'Entrar · MZD Carros e Motores'; }, []);
 
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<Dados>({
     resolver: zodResolver(esquema),
@@ -63,7 +64,7 @@ export default function Login() {
         </div>
 
         <div className="relative">
-          <p className="rotulo !text-zinc-500">Gestão de oficina</p>
+          <p className="rotulo !text-zinc-400">Gestão de oficina</p>
           <p className="mt-3 max-w-md font-display text-[34px] font-extrabold leading-[1.08] [font-stretch:108%]">
             Cada viatura, do portão à entrega. Quem fez o quê, e quando.
           </p>
@@ -72,13 +73,13 @@ export default function Login() {
             {ESTADOS_ORDEM.map((e, i) => (
               <li key={e}>
                 <span className={`block h-[5px] rounded-[1px] ${i < 5 ? 'bg-white' : i === 5 ? 'bg-mzd-red' : 'bg-white/15'}`} />
-                <span className="num mt-1.5 block text-[10px] text-zinc-500">{String(i + 1).padStart(2, '0')}</span>
+                <span className="num mt-1.5 block text-[10px] text-zinc-400">{String(i + 1).padStart(2, '0')}</span>
               </li>
             ))}
           </ol>
         </div>
 
-        <p className="text-xs text-zinc-500">MZD Carros e Motores · Luanda</p>
+        <p className="text-xs text-zinc-400">MZD Carros e Motores · Luanda</p>
       </aside>
 
       <main className="flex items-center justify-center px-4 py-10 sm:px-10">

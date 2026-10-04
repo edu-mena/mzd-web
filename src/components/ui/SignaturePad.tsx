@@ -90,7 +90,7 @@ export default function SignaturePad({
           role="img"
         />
         <div className="pointer-events-none absolute inset-x-6 bottom-9 border-b border-dashed border-zinc-300" />
-        {vazia && <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-zinc-400">Assine aqui com o dedo, caneta ou rato</p>}
+        {vazia && <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-mzd-gray">Assine aqui com o dedo, caneta ou rato</p>}
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <p className="text-xs text-mzd-gray">{legenda}</p>

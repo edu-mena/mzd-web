@@ -36,6 +36,7 @@ export default function ViaturaDetail() {
     <div className="pagina space-y-5">
       <PageHeader
         voltar={{ to: '/viaturas', label: 'Viaturas' }}
+        tituloDocumento={viatura.matricula}
         titulo={
           <span className="flex flex-wrap items-center gap-3">
             <Matricula valor={viatura.matricula} tamanho="lg" />
