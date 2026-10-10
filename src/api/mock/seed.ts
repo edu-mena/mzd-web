@@ -46,7 +46,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 16;
+export const VERSAO_DB = 17;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -223,7 +223,7 @@ export function criarSeed(): MockDB {
     motivoIsencaoIva: 'Isento de IVA',
     valorHora: 8500,
     validadeOrcamentoDias: 10,
-    condicoes: { pecasAceitacaoPct: 100, maoObraAceitacaoPct: 60, parqueamentoDia: 2000, diasUteisLevantamento: 5 },
+    condicoes: { pecasAceitacaoPct: 100, maoObraAceitacaoPct: 60, parqueamentoDia: 3600, diasUteisLevantamento: 5 },
     garantiaPecasMeses: 6,
     garantiaMaoObraMeses: 3,
     capacidadeDiaria: 6,

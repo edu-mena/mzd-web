@@ -22,7 +22,7 @@ export const VARIAVEIS_MODELO: { chave: string; descricao: string; exemplo: stri
   { chave: 'condicoes', descricao: 'Condições de pagamento do orçamento', exemplo: 'Na aceitação do orçamento: 100% das peças e 60% da mão de obra. No levantamento da viatura: 40% da mão de obra.' },
   { chave: 'pagamento_aceitacao', descricao: 'Valor a pagar na aceitação do orçamento', exemplo: '142 500 Kz' },
   { chave: 'pagamento_falta', descricao: 'Valor que ainda falta do pagamento da aceitação', exemplo: '142 500 Kz' },
-  { chave: 'parqueamento_dia', descricao: 'Parqueamento por dia depois dos prazos', exemplo: '2 000 Kz + IVA' },
+  { chave: 'parqueamento_dia', descricao: 'Parqueamento por dia depois dos prazos', exemplo: '3 600 Kz + IVA' },
   { chave: 'levantar_ate', descricao: 'Último dia para levantar a viatura sem parqueamento', exemplo: 'sexta-feira, 17 de outubro' },
   { chave: 'adicional_motivo', descricao: 'Justificação do trabalho adicional', exemplo: 'Disco de travão empenado' },
   { chave: 'adicional_total', descricao: 'Valor do trabalho adicional com IVA', exemplo: '42 000 Kz' },

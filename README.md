@@ -64,7 +64,7 @@ src/
   (foto ou PDF) + `PUT /processos/:id/ficha-entrada` com `km` (obrigatório, não pode recuar), `combustivel?` e `pertences?`.
   Sem ficha não se inicia o diagnóstico. Não há assinatura digital na receção nem na aceitação.
 - **Condições comerciais** (Definições → `condicoes`, copiadas para o orçamento quando é guardado): % das peças e da mão de obra
-  pagas na aceitação (100% / 60%), validade para aceitar (10 dias), parqueamento por dia (2 000 Kz, sem IVA) e dias úteis para
+  pagas na aceitação (100% / 60%), validade para aceitar (10 dias), parqueamento por dia (3 600 Kz, sem IVA) e dias úteis para
   levantar (5). `valorAceitacao()` em [src/lib/calculos.ts](src/lib/calculos.ts) é a regra única do valor.
 - **Pagamento da aceitação.** Depois de aceite, a reparação só começa (tarefas, horas, conclusão) com esse valor recebido;
   a Direção pode dispensá-lo (`POST /processos/:id/pagamento-aceitacao/dispensar`). O servidor devolve `aguardaPagamento`
