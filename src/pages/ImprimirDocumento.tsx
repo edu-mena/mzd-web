@@ -5,8 +5,9 @@ import { useProcesso } from '../api/hooks';
 import { Carregando, ErroCarregamento } from '../components/ui/Estados';
 import { FichaEntradaModelo } from '../documents/FichaRecepcaoDoc';
 import OrcamentoDoc from '../documents/OrcamentoDoc';
+import { FichaDiagnosticoModelo } from '../documents/DiagnosticoDoc';
 
-const TITULOS = { ficha: 'Ficha de entrada', proforma: 'Pró-forma' } as const;
+const TITULOS = { ficha: 'Ficha de entrada', diagnostico: 'Ficha de diagnóstico', proforma: 'Pró-forma' } as const;
 
 /**
  * Documento sozinho numa página, para imprimir: a ficha de entrada (a receção entrega-a ao mecânico)
@@ -16,7 +17,7 @@ export default function ImprimirDocumento() {
   const { id = '', documento = '' } = useParams();
   const { data: processo, isPending, error, refetch } = useProcesso(id);
   const impresso = useRef(false);
-  const tipo = documento === 'proforma' ? 'proforma' : 'ficha';
+  const tipo: keyof typeof TITULOS = documento === 'proforma' || documento === 'diagnostico' ? documento : 'ficha';
 
   useEffect(() => {
     if (!processo || impresso.current) return;
@@ -37,7 +38,7 @@ export default function ImprimirDocumento() {
         </Link>
         <span className="text-mzd-gray">{TITULOS[tipo]}</span>
       </p>
-      {tipo === 'proforma' ? <OrcamentoDoc processo={processo} /> : <FichaEntradaModelo processo={processo} />}
+      {tipo === 'proforma' ? <OrcamentoDoc processo={processo} /> : tipo === 'diagnostico' ? <FichaDiagnosticoModelo processo={processo} /> : <FichaEntradaModelo processo={processo} />}
     </div>
   );
 }

@@ -134,7 +134,19 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
         { ok: avaliados >= SISTEMAS_VEICULO.length, texto: `Sistemas avaliados: ${avaliados}/${SISTEMAS_VEICULO.length}` },
         { ok: (p.diagnostico?.parecerGeral.length ?? 0) >= 10, texto: 'Parecer técnico escrito' },
       ];
-      corpo = can('processos.atribuir') && <AtribuirMecanico processo={p} />;
+      corpo = (
+        <>
+          {can('diagnostico.editar') && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-linha bg-white p-4">
+              <p className="min-w-0 flex-1 text-[13px] text-mzd-graphite">
+                Imprima a ficha de diagnóstico para o mecânico preencher à mão; depois registe aqui o que ele encontrou.
+              </p>
+              <LinkImprimir processoId={p.id} documento="diagnostico">Imprimir ficha de diagnóstico</LinkImprimir>
+            </div>
+          )}
+          {can('processos.atribuir') && <AtribuirMecanico processo={p} />}
+        </>
+      );
       acoes = can('diagnostico.editar') && (
         mecanicoBloqueado
           ? <p className="text-xs text-mzd-gray">Atribuído a {p.mecanico?.nome}.</p>

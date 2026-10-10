@@ -216,7 +216,7 @@ function FichaNoEcra({ processo }: { processo: ProcessoDetalhado }) {
 }
 
 /** Botão para abrir o modelo da ficha (ou outro documento) numa página própria, pronta a imprimir. */
-export function LinkImprimir({ processoId, documento, children }: { processoId: string; documento: 'ficha' | 'proforma'; children: string }) {
+export function LinkImprimir({ processoId, documento, children }: { processoId: string; documento: 'ficha' | 'diagnostico' | 'proforma'; children: string }) {
   return (
     <a href={`/processos/${processoId}/imprimir/${documento}`} target="_blank" rel="noopener noreferrer" className={botao('secundario')}>
       <Printer size={15} /> {children}
