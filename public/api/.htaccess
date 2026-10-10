@@ -1,0 +1,15 @@
+# API PHP da MZD: tudo passa pelo index.php; o código interno e os dados por omissão não se servem diretamente.
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(nucleo|dados)(/|$) - [F,L]
+  RewriteRule ^cli\.php$ - [F,L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+<FilesMatch "\.(json|log)$">
+  Require all denied
+</FilesMatch>

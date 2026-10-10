@@ -1,0 +1,79 @@
+[
+ {
+  "chave": "rececao",
+  "nome": "Viatura recebida",
+  "descricao": "Ao abrir o processo, depois da receção.",
+  "assunto": "{oficina} · Processo {processo} — viatura recebida",
+  "texto": "Olá {cliente}, confirmamos a receção da sua viatura {viatura} ({matricula}) na {oficina}.\nProcesso nº {processo}.\nPrevisão de entrega: {prazo}.\n\nAcompanhe a reparação aqui: {link}"
+ },
+ {
+  "chave": "diagnostico",
+  "nome": "Em diagnóstico",
+  "descricao": "Enquanto o mecânico faz o diagnóstico.",
+  "assunto": "{oficina} · Processo {processo} — em diagnóstico",
+  "texto": "Olá {cliente}, a sua viatura {viatura} ({matricula}) está em diagnóstico. Entraremos em contacto assim que tivermos o resultado."
+ },
+ {
+  "chave": "orcamento",
+  "nome": "Diagnóstico e orçamento",
+  "descricao": "Com o orçamento pronto, para o cliente aprovar.",
+  "assunto": "{oficina} · Processo {processo} — diagnóstico e orçamento",
+  "texto": "Olá {cliente}, o diagnóstico da sua viatura {viatura} ({matricula}) está concluído.\n\nEncontrámos:\n{problemas}\n\nValor total: {total} (IVA incluído).\n{condicoes}\nA pagar na aceitação: {pagamento_aceitacao}.\n\nPode aceitar até {aceitar_ate}. Depois dessa data, a viatura fica em parqueamento ({parqueamento_dia} por dia).\n\nVeja o orçamento e aceite aqui: {link}\nTambém pode responder ACEITO a esta mensagem ou assinar a pró-forma na oficina."
+ },
+ {
+  "chave": "adicional",
+  "nome": "Trabalho adicional",
+  "descricao": "Quando aparece trabalho extra durante a reparação.",
+  "assunto": "{oficina} · Processo {processo} — trabalho adicional",
+  "texto": "Olá {cliente}, durante a reparação da sua viatura {matricula} encontrámos trabalho adicional necessário:\n{adicional_motivo}\n\nValor adicional: {adicional_total} (IVA incluído).\n\nVeja o detalhe e decida aqui: {link}\nTambém pode responder SIM a esta mensagem."
+ },
+ {
+  "chave": "pagamento",
+  "nome": "Pagamento da aceitação",
+  "descricao": "Orçamento aceite: falta o pagamento para a reparação começar.",
+  "assunto": "{oficina} · Processo {processo} — pagamento para iniciar a reparação",
+  "texto": "Olá {cliente}, obrigado por aceitar o orçamento da viatura {matricula}.\nPara começarmos a reparação falta o pagamento de {pagamento_falta}.\n\nPode pagar na oficina (TPA, Multicaixa Express ou numerário) ou por transferência:\n{coordenadas}\n\nIndique o processo {processo} no descritivo e envie-nos o comprovativo."
+ },
+ {
+  "chave": "reparacao",
+  "nome": "Em reparação",
+  "descricao": "Ponto de situação durante a reparação.",
+  "assunto": "{oficina} · Processo {processo} — em reparação",
+  "texto": "Olá {cliente}, a reparação da sua viatura {viatura} ({matricula}) está em curso.\nPrevisão de entrega: {prazo}.\nAcompanhe aqui: {link}"
+ },
+ {
+  "chave": "pronta",
+  "nome": "Pronta para levantamento",
+  "descricao": "Depois do controlo de qualidade aprovado.",
+  "assunto": "{oficina} · Processo {processo} — viatura pronta",
+  "texto": "Olá {cliente}, a sua viatura {viatura} ({matricula}) está pronta para levantamento.\nValor a pagar: {saldo}.\nDetalhes do serviço: {link}\n\nPode levantá-la até {levantar_ate}, de segunda a sexta das 07h30 às 18h e ao sábado até às 13h. Depois dessa data aplica-se parqueamento ({parqueamento_dia} por dia)."
+ },
+ {
+  "chave": "entregue",
+  "nome": "Agradecimento",
+  "descricao": "Depois da entrega, para saber como correu.",
+  "assunto": "{oficina} · Obrigado pela confiança",
+  "texto": "Olá {cliente}, obrigado pela confiança na {oficina}. Como correu a experiência com a reparação da sua viatura {matricula}? A sua opinião ajuda-nos a melhorar."
+ },
+ {
+  "chave": "marcacao",
+  "nome": "Lembrete de marcação",
+  "descricao": "Na véspera de uma marcação.",
+  "assunto": "{oficina} · Lembrete da sua marcação",
+  "texto": "Olá {cliente}, lembramos a sua marcação na {oficina} {data_marcacao} às {hora_marcacao}.\nViatura: {matricula}.\n\nPode confirmar respondendo a esta mensagem."
+ },
+ {
+  "chave": "divida",
+  "nome": "Lembrete de pagamento",
+  "descricao": "Faturas por pagar há mais de 30 dias.",
+  "assunto": "{oficina} · Faturas em aberto",
+  "texto": "Olá {cliente}, lembramos que tem {divida_total} por liquidar na {oficina} ({faturas}).\nPode pagar por TPA, Multicaixa Express ou transferência bancária:\n{coordenadas}\n\nObrigado."
+ },
+ {
+  "chave": "livre",
+  "nome": "Mensagem livre",
+  "descricao": "Ponto de partida para qualquer outro assunto.",
+  "assunto": "{oficina}",
+  "texto": "Olá {cliente}, "
+ }
+]

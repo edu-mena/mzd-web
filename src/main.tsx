@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import App from './App.tsx';
-import { ApiError } from './api/client';
+import { ApiError, iniciarApi } from './api/client';
 import { chaves } from './api/hooks';
 
 // Se qualquer pedido devolver 401, a sessão terminou: limpa-se o utilizador e o RequireAuth envia para /login.
@@ -23,10 +23,13 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+// Primeiro decide-se se fala com o backend PHP ou com a demonstração (ver api/client.ts).
+void iniciarApi().then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+});

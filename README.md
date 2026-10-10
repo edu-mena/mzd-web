@@ -4,7 +4,8 @@ Sistema de gestão de processos de oficina automóvel: receção, diagnóstico, 
 reparação, controlo de qualidade, faturação e entrega, com registo de quem fez o quê e quando.
 
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS 4, TanStack Query, react-hook-form + zod, Recharts.
-- **Backend (a construir):** PHP + MySQL na Hostinger. A multimédia fica numa pasta no servidor, servida apenas através do PHP.
+- **Backend:** PHP 8 + MySQL na Hostinger, em [public/api](public/api) (o build copia-o para `dist/api`). Os ficheiros
+  (fotos, digitalizações, cópias) ficam numa pasta fora de `public_html`, servidos apenas através do PHP.
 
 ## Desenvolvimento
 
@@ -109,8 +110,28 @@ O site está em **https://mzd.it.ao**. A Hostinger está ligada ao ramo **`main`
 - O [public/.htaccess](public/.htaccess) vai para `dist/` no build e trata das rotas da aplicação (abrir `/processos/…`
   diretamente ou atualizar a página), dos cabeçalhos de segurança e da cache.
 
-Enquanto não houver backend, o site publicado corre em modo de demonstração. Para usar o PHP, defina a
-variável de ambiente `VITE_API_MODE=http` na configuração de build da Hostinger.
+O site publicado pergunta ao PHP (`/api/saude`) se o sistema já foi instalado: se sim usa o backend, se não mostra
+a demonstração. Não é preciso mudar nada na configuração de build da Hostinger.
+
+## Backend PHP (instalação na Hostinger)
+
+1. hPanel → **Bases de dados → MySQL**: criar a base de dados, o utilizador e a palavra-passe.
+2. Abrir **https://mzd.it.ao/api/instalar.php** e preencher a base de dados, os dados da empresa e as contas iniciais
+   (administradores, Direção, Receção). Guardar as palavras-passe temporárias mostradas no fim (cada pessoa muda a sua no
+   primeiro acesso). A partir daí a página de instalação deixa de funcionar e o site passa a usar o servidor.
+3. Em **Definições**, a Direção preenche as coordenadas de pagamento (IBAN) e confirma as condições comerciais.
+
+- **Onde ficam os dados:** `…/domains/mzd.it.ao/mzd-dados/` (ao lado de `public_html`, nunca dentro): `config.php`
+  (credenciais da base de dados), `ficheiros/` (anexos dos processos), `media/site/` (imagens do site), `copias/`,
+  `sessoes/` e `erros.log`. Os deploys do Git não lhes tocam.
+- **Base de dados:** `mzd_documentos` (um documento JSON por registo, por coleção — as mesmas formas que o frontend usa),
+  `mzd_auditoria` e `mzd_limites` (tentativas de login e pedidos públicos). As escritas são feitas em série, numa transação.
+- **Cópias de segurança:** uma por dia, automática (no primeiro pedido depois das 03:00), guardadas 30 dias em `copias/`.
+  Opcionalmente, Cron: `php ~/domains/mzd.it.ao/public_html/api/cli.php copia`. Reposição por SSH:
+  `php api/cli.php repor mzd-dados/copias/<ficheiro>.json.gz`.
+- **Email:** enviado com `mail()` da Hostinger, com o email da oficina como remetente (convém que seja uma caixa do domínio).
+- **Teste local:** `php -d extension=pdo_sqlite -S …` com `MZD_DADOS` a apontar para uma pasta e um `config.php` com
+  `'db' => ['driver' => 'sqlite', 'ficheiro' => …]`.
 
 O [public/.htaccess](public/.htaccess) encaminha as rotas da aplicação, deixa `/api` para o PHP, bloqueia
 ficheiros ocultos e de configuração e define cabeçalhos de segurança (HSTS e Content-Security-Policy: só scripts do próprio site) e de cache. O HTTPS está ativo e forçado no hPanel.
@@ -172,4 +193,5 @@ As contas reais criam-se na instalação do backend (fora do repositório, que �
 | F9 | Painéis por função, alertas "pede atenção", relatórios por período com comparação e CSV | ✅ |
 | F10 | Administração: contas da equipa, senha temporária obrigatória, auditoria com filtros, cópias de segurança, estado do sistema | ✅ |
 | F11 | Acabamento: WCAG 2.1 AA sem falhas (axe), teclado e foco, títulos, rede de segurança para erros, CSP, Ajuda por função | ✅ |
+| Backend | API PHP + MySQL com as mesmas regras do servidor simulado, instalador, cópias diárias, ficheiros fora do `public_html` | ✅ |
 | F12 | Pedidos da Direção (10/2026): fatura sem IVA, pagamento na aceitação (100% peças + 60% mão de obra), parqueamento, coordenadas de pagamento, ficha de entrada em papel, aceitação do orçamento explicada, site multimarca | ✅ |
