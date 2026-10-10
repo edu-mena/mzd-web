@@ -11,19 +11,33 @@ import SignaturePad from '../../components/ui/SignaturePad';
 import { Checkbox, Escolha, Field, Input, Textarea } from '../../components/ui/Form';
 import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
-import { emDivida } from '../../lib/calculos';
+import { emDivida, faltaPagamentoAceitacao, saldoEmAberto } from '../../lib/calculos';
 
-export function FormPagamento({ processo, onFechar }: { processo: ProcessoDetalhado; onFechar: () => void }) {
+/** O que se pode pagar num processo: a fatura do serviço (ou, antes dela, o adiantamento) e as de parqueamento. */
+function opcoesPagamento(p: ProcessoDetalhado) {
+  const servico = p.estado === 'cancelado' ? [] : [p.fatura
+    ? { fatura: p.fatura.numero as string | undefined, label: `Fatura do serviço ${p.fatura.numero}`, divida: saldoEmAberto(p.fatura) }
+    : { fatura: undefined, label: faltaPagamentoAceitacao(p) > 0 ? 'Pagamento da aceitação' : 'Adiantamento', divida: emDivida(p) }];
+  const parqueamento = (p.faturasParqueamento ?? []).map((f) => ({ fatura: f.numero as string | undefined, label: `Parqueamento ${f.numero}`, divida: saldoEmAberto(f) }));
+  return [...servico, ...parqueamento].filter((o) => o.divida > 0);
+}
+
+export function FormPagamento({ processo, fatura, onFechar }: { processo: ProcessoDetalhado; fatura?: string; onFechar: () => void }) {
   const toast = useToast();
   const acao = useAcaoProcesso();
-  const divida = emDivida(processo);
-  const [valor, setValor] = useState(String(Math.round(divida)));
+  const opcoes = opcoesPagamento(processo);
+  const [alvo, setAlvo] = useState(() => (opcoes.find((o) => o.fatura === fatura) ?? opcoes[0])?.fatura ?? '');
+  const escolhida = opcoes.find((o) => (o.fatura ?? '') === alvo) ?? opcoes[0];
+  const divida = escolhida?.divida ?? 0;
+  // Antes da fatura, o valor proposto é o que falta do pagamento da aceitação (se faltar).
+  const sugerido = !escolhida?.fatura && faltaPagamentoAceitacao(processo) > 0 ? faltaPagamentoAceitacao(processo) : divida;
+  const [valor, setValor] = useState(String(Math.round(sugerido)));
   const [forma, setForma] = useState<FormaPagamento>();
   const [referencia, setReferencia] = useState('');
 
   function registar() {
     if (!forma) return toast('Indique a forma de pagamento.', 'erro');
-    acao.mutate(() => api.processos.registarPagamento(processo.id, { valor: Number(valor), forma, referencia: referencia.trim() || undefined }), {
+    acao.mutate(() => api.processos.registarPagamento(processo.id, { valor: Number(valor), forma, referencia: referencia.trim() || undefined, fatura: escolhida?.fatura }), {
       onSuccess: () => {
         toast('Pagamento registado');
         onFechar();
@@ -36,16 +50,30 @@ export function FormPagamento({ processo, onFechar }: { processo: ProcessoDetalh
     <Modal
       open
       onClose={onFechar}
-      title={processo.fatura ? `Pagamento da fatura ${processo.fatura.numero}` : 'Adiantamento'}
+      title={escolhida?.label ?? 'Pagamento'}
       footer={
         <>
           <Button variante="fantasma" onClick={onFechar}>Cancelar</Button>
-          <Button onClick={registar} carregando={acao.isPending} disabled={!forma || !Number(valor)}>Registar pagamento</Button>
+          <Button onClick={registar} carregando={acao.isPending} disabled={!forma || !Number(valor) || !escolhida}>Registar pagamento</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-mzd-gray">Em dívida: <Kz valor={divida} className="font-semibold text-mzd-black" /></p>
+        {opcoes.length > 1 && (
+          <Escolha
+            label="O que paga"
+            valor={escolhida?.fatura ?? ''}
+            onChange={(v) => {
+              setAlvo(v);
+              setValor(String(Math.round(opcoes.find((o) => (o.fatura ?? '') === v)?.divida ?? 0)));
+            }}
+            opcoes={opcoes.map((o) => ({ valor: o.fatura ?? '', label: o.label }))}
+          />
+        )}
+        <p className="text-sm text-mzd-gray">
+          Em dívida: <Kz valor={divida} className="font-semibold text-mzd-black" />
+          {!escolhida?.fatura && faltaPagamentoAceitacao(processo) > 0 && <> · a reparação começa com <Kz valor={faltaPagamentoAceitacao(processo)} className="font-semibold text-mzd-black" /></>}
+        </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Valor (Kz)">{(a) => <Input {...a} value={valor} onChange={(e) => setValor(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="num text-base" autoFocus />}</Field>
           <Field label="Referência" hint="Obrigatória em transferência e Multicaixa">{(a) => <Input {...a} value={referencia} onChange={(e) => setReferencia(e.target.value)} />}</Field>
@@ -60,8 +88,9 @@ export function FormPagamento({ processo, onFechar }: { processo: ProcessoDetalh
 export function FormEntrega({ processo, onFechar }: { processo: ProcessoDetalhado; onFechar: () => void }) {
   const toast = useToast();
   const acao = useAcaoProcesso();
-  const [km, setKm] = useState(String(processo.fichaRecepcao.km));
-  const [combustivel, setCombustivel] = useState(processo.fichaRecepcao.combustivel);
+  const kmEntrada = processo.fichaRecepcao.km ?? 0;
+  const [km, setKm] = useState(String(kmEntrada));
+  const [combustivel, setCombustivel] = useState(processo.fichaRecepcao.combustivel ?? 50);
   const [observacoes, setObservacoes] = useState('');
   const [pertences, setPertences] = useState(false);
   const [pecasMostradas, setPecasMostradas] = useState(false);
@@ -104,7 +133,7 @@ export function FormEntrega({ processo, onFechar }: { processo: ProcessoDetalhad
     >
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Quilometragem na saída" hint={`Na receção: ${processo.fichaRecepcao.km.toLocaleString('pt-PT')} km`}>
+          <Field label="Quilometragem na saída" hint={`Na receção: ${kmEntrada.toLocaleString('pt-PT')} km`}>
             {(a) => <Input {...a} value={km} onChange={(e) => setKm(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="num" />}
           </Field>
           <div>

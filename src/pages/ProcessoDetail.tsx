@@ -41,6 +41,7 @@ import AutorizacaoDoc from '../documents/AutorizacaoDoc';
 import ChecklistQualidadeDoc from '../documents/ChecklistQualidadeDoc';
 import RelatorioServicosDoc from '../documents/RelatorioServicosDoc';
 import FaturaDoc from '../documents/FaturaDoc';
+import FaturaParqueamentoDoc from '../documents/FaturaParqueamentoDoc';
 
 const URGENCIA_LABEL = { baixo: 'Baixa', medio: 'Média', alto: 'Alta', seguranca: 'Risco de segurança' } as const;
 const ORCAMENTO_LABEL = { rascunho: 'Em preparação', enviado: 'Enviado ao cliente', aprovado: 'Aprovado', recusado: 'Recusado' } as const;
@@ -241,7 +242,7 @@ function VisaoGeral({ processo, verValores }: { processo: ProcessoDetalhado; ver
           <Dado label="NIF"><span className="num">{cliente.nif ?? '—'}</span></Dado>
           <Dado label="Viatura">{viatura.marca} {viatura.modelo} · {viatura.ano}</Dado>
           <Dado label="Cor">{viatura.cor}</Dado>
-          <Dado label="Km na receção"><span className="num">{processo.fichaRecepcao.km.toLocaleString('pt-PT')}</span></Dado>
+          <Dado label="Km na receção"><span className="num">{processo.fichaRecepcao.km?.toLocaleString('pt-PT') ?? 'Ficha por digitalizar'}</span></Dado>
         </dl>
       </Card>
       <Card>
@@ -262,14 +263,17 @@ function VisaoGeral({ processo, verValores }: { processo: ProcessoDetalhado; ver
 }
 
 function Documentos({ processo, verValores }: { processo: ProcessoDetalhado; verValores: boolean }) {
-  const docs = [
-    { id: 'ficha', label: 'Ficha de Receção', pronto: true, render: <FichaRecepcaoDoc processo={processo} /> },
+  const docs: { id: string; label: string; valores?: boolean; pronto: boolean; render: ReactNode }[] = [
+    { id: 'ficha', label: 'Ficha de Entrada', pronto: processo.fichaRecepcao.assinaturaCliente, render: <FichaRecepcaoDoc processo={processo} /> },
     { id: 'diag', label: 'Diagnóstico', pronto: !!processo.diagnostico, render: <DiagnosticoDoc processo={processo} /> },
     { id: 'orc', label: 'Orçamento / Pró-forma', valores: true, pronto: !!processo.orcamento, render: <OrcamentoDoc processo={processo} /> },
     { id: 'aut', label: 'Declaração de Autorização', valores: true, pronto: !!processo.autorizacao, render: <AutorizacaoDoc processo={processo} /> },
     { id: 'cq', label: 'Controlo de Qualidade', pronto: !!processo.checklistQualidade, render: <ChecklistQualidadeDoc processo={processo} /> },
     { id: 'rel', label: 'Relatório de Serviços', pronto: !!processo.checklistQualidade, render: <RelatorioServicosDoc processo={processo} /> },
     { id: 'fat', label: 'Fatura / Recibo + Garantia', valores: true, pronto: !!processo.fatura, render: <FaturaDoc processo={processo} /> },
+    ...(processo.faturasParqueamento ?? []).map((f) => ({
+      id: f.numero, label: `Fatura de Parqueamento ${f.numero.split('-').pop()}`, valores: true, pronto: true, render: <FaturaParqueamentoDoc processo={processo} fatura={f} />,
+    })),
   ].filter((d) => verValores || !d.valores);
   const [ativo, setAtivo] = useState(docs[0].id);
   const atual = docs.find((d) => d.id === ativo) ?? docs[0];

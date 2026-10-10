@@ -11,11 +11,13 @@ import Matricula from '../components/ui/Matricula';
 import Button from '../components/ui/Button';
 import { Aviso } from '../components/ui/Controls';
 import { MiniaturaAnexo, VisualizadorAnexo } from '../components/ui/Anexos';
-import { formatAOA, formatDate, formatDateTime } from '../lib/format';
-import { linkWhatsApp } from '../lib/mensagens';
+import { formatAOA, formatDate, formatDateTime, formatDia } from '../lib/format';
+import { diaPorExtenso, linkWhatsApp } from '../lib/mensagens';
+import { textoCondicoes } from '../lib/calculos';
 import { frasePrincipal, HORARIO_OFICINA, totalDe } from '../lib/portal';
 import LinhasOrcamento from './portal/LinhasOrcamento';
 import Decisao from './portal/Decisao';
+import Coordenadas from './portal/Coordenadas';
 import iconMzd from '../assets/icon.png';
 
 const dataLonga = (iso: string) => new Date(iso).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -99,6 +101,8 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
   const porDecidir = p.estado === 'aguarda_aprovacao' && o?.estado === 'enviado';
   const adicionais = p.adicionais.filter((a) => a.estado === 'enviado' && p.estado === 'em_reparacao');
   const whatsapp = linkWhatsApp(p.oficina.telefone, `Olá, sou ${p.cliente.nome.split(' ')[0]} — processo ${p.numero} (${p.viatura.matricula}).`);
+  const parqueDia = o ? `${formatAOA(o.condicoes.parqueamentoDia)} por dia${o.taxaIva > 0 ? ' + IVA' : ''}` : '';
+  const aPagarLevantamento = (p.valores?.aPagar ?? 0) + (p.parqueamento?.valor ?? 0);
 
   return (
     <div className="space-y-4">
@@ -150,18 +154,51 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
             </>
           )}
           <LinhasOrcamento orcamento={o} />
-          <p className="mt-3 text-xs text-mzd-gray">
-            {o.condicoesPagamento}{o.validoAte && <> · válido até {formatDate(o.validoAte)}</>}
-          </p>
+
+          <div className="mt-4 rounded-md bg-papel px-4 py-3">
+            <p className="rotulo mb-1.5">Como se paga</p>
+            <dl className="space-y-1 text-[13.5px]">
+              <div className="flex justify-between gap-3"><dt className="text-mzd-graphite">Ao aceitar <span className="text-xs text-mzd-gray">(para começarmos)</span></dt><dd className="num font-semibold text-mzd-black">{formatAOA(o.pagamentoAceitacao)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-mzd-graphite">No levantamento</dt><dd className="num font-semibold text-mzd-black">{formatAOA(o.pagamentoLevantamento)}</dd></div>
+            </dl>
+            <p className="mt-1.5 text-xs text-mzd-gray">{textoCondicoes(o.condicoes)}</p>
+          </div>
+
           {o.expirado ? (
-            <div className="mt-4"><Aviso>A validade terminou. Fale connosco para confirmar os valores antes de aprovar.</Aviso></div>
-          ) : (
-            <div className="mt-4 grid gap-2 sm:grid-cols-[2fr_1fr]">
-              <Button className="h-12 text-[15px]" icone={<Check size={17} />} onClick={() => setDecisao({ decisao: 'aprovado', total: totalDe(o).total, condicoes: o.condicoesPagamento })}>
-                Aprovar e avançar
-              </Button>
-              <Button variante="secundario" className="h-12" onClick={() => setDecisao({ decisao: 'recusado', total: totalDe(o).total })}>Não aprovar</Button>
+            <div className="mt-4">
+              <Aviso>
+                O prazo para aceitar terminou{o.validoAte && <> a {formatDate(o.validoAte)}</>}. A viatura está em parqueamento ({parqueDia})
+                {p.parqueamento && <>: {p.parqueamento.dias} dia(s), {formatAOA(p.parqueamento.valor)} até hoje</>}. Pode aceitar na mesma.
+              </Aviso>
             </div>
+          ) : o.validoAte && (
+            <p className="mt-3 text-[13px] text-mzd-graphite">
+              Pode aceitar até <strong className="first-letter:uppercase">{dataLonga(o.validoAte)}</strong>. Depois dessa data, a viatura fica em parqueamento ({parqueDia}).
+            </p>
+          )}
+          <div className="mt-4 grid gap-2 sm:grid-cols-[2fr_1fr]">
+            <Button className="h-12 text-[15px]" icone={<Check size={17} />} onClick={() => setDecisao({ decisao: 'aprovado', total: totalDe(o).total, condicoes: textoCondicoes(o.condicoes) })}>
+              Aceitar orçamento
+            </Button>
+            <Button variante="secundario" className="h-12" onClick={() => setDecisao({ decisao: 'recusado', total: totalDe(o).total })}>Não aceitar</Button>
+          </div>
+          <p className="mt-2 text-xs text-mzd-gray">Prefere tratar na oficina? Pode assinar a pró-forma ao balcão ou responder ACEITO à nossa mensagem.</p>
+        </Seccao>
+      )}
+
+      {p.aguardaPagamentoAceitacao !== undefined && (
+        <Seccao titulo="Pagamento para começarmos" className="border-mzd-black">
+          <p className="text-[14px] text-mzd-graphite">
+            Obrigado por aceitar. Para encomendarmos as peças e começarmos a reparação, falta o pagamento de{' '}
+            <strong className="num font-display text-lg text-mzd-black">{formatAOA(p.aguardaPagamentoAceitacao)}</strong>.
+          </p>
+          {p.parqueamento && (
+            <p className="mt-2 text-[13px] text-mzd-graphite">
+              Há também {formatAOA(p.parqueamento.valor)} de parqueamento ({p.parqueamento.dias} dia(s) depois do prazo para aceitar), a pagar até ao levantamento.
+            </p>
+          )}
+          {p.oficina.coordenadas.length > 0 && (
+            <div className="mt-3"><Coordenadas contas={p.oficina.coordenadas} instrucoes={p.oficina.instrucoesPagamento} referencia={p.numero} /></div>
           )}
         </Seccao>
       )}
@@ -179,16 +216,32 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
 
       {p.estado === 'pronta_entrega' && (
         <Seccao titulo="Levantamento">
-          {p.valores && p.valores.aPagar > 0 ? (
-            <p className="text-[14px] text-mzd-graphite">Valor a pagar no levantamento: <strong className="num font-display text-lg text-mzd-black">{formatAOA(p.valores.aPagar)}</strong></p>
+          {aPagarLevantamento > 0 ? (
+            <p className="text-[14px] text-mzd-graphite">Valor a pagar no levantamento: <strong className="num font-display text-lg text-mzd-black">{formatAOA(aPagarLevantamento)}</strong></p>
           ) : (
             <p className="text-[14px] text-sinal-verde">O serviço está pago.</p>
+          )}
+          {p.parqueamento ? (
+            <div className="mt-3">
+              <Aviso>
+                Inclui parqueamento desde {formatDia(p.parqueamento.desde)}: {p.parqueamento.dias} dia(s), {formatAOA(p.parqueamento.valor)} até hoje. Continua a contar até levantar a viatura.
+              </Aviso>
+            </div>
+          ) : p.levantarAte && (
+            <p className="mt-2 text-[13.5px] text-mzd-graphite">
+              Pode levantar sem custos até <strong className="first-letter:uppercase">{diaPorExtenso(p.levantarAte)}</strong>. Depois disso, aplica-se parqueamento ({parqueDia}).
+            </p>
           )}
           <ul className="mt-3 space-y-1.5 text-[13.5px] text-mzd-graphite">
             <li>{HORARIO_OFICINA}</li>
             <li className="flex gap-1.5"><MapPin size={14} className="mt-0.5 shrink-0" /> {p.oficina.morada}</li>
-            <li>Pagamento por TPA, Multicaixa Express, transferência ou numerário.{p.oficina.iban && <> IBAN <span className="num">{p.oficina.iban}</span></>}</li>
           </ul>
+          {aPagarLevantamento > 0 && p.oficina.coordenadas.length > 0 && (
+            <div className="mt-3">
+              <p className="rotulo mb-1.5">Pagar por transferência</p>
+              <Coordenadas contas={p.oficina.coordenadas} instrucoes={p.oficina.instrucoesPagamento} referencia={p.numero} />
+            </div>
+          )}
         </Seccao>
       )}
 
@@ -223,16 +276,17 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
       {p.autorizacao && (
         <p className="flex items-start gap-2 px-1 text-xs text-mzd-gray">
           <ShieldCheck size={14} className="mt-px shrink-0 text-sinal-verde" />
-          Orçamento aprovado por {p.autorizacao.autorizadoPor} em {formatDateTime(p.autorizacao.data)} ({METODO_APROVACAO_LABEL[p.autorizacao.metodo].toLowerCase()}).
+          Orçamento aceite por {p.autorizacao.autorizadoPor} em {formatDateTime(p.autorizacao.data)} ({METODO_APROVACAO_LABEL[p.autorizacao.metodo].toLowerCase()}).
         </p>
       )}
 
       {p.valores && p.estado !== 'pronta_entrega' && (
         <Seccao titulo="Valores">
           <dl className="space-y-1 text-[13.5px]">
-            <div className="flex justify-between"><dt className="text-mzd-gray">Total do serviço (IVA incluído)</dt><dd className="num">{formatAOA(p.valores.total)}</dd></div>
+            <div className="flex justify-between"><dt className="text-mzd-gray">Total do serviço{o?.isencaoIva ? ' (sem IVA)' : ' (IVA incluído)'}</dt><dd className="num">{formatAOA(p.valores.total)}</dd></div>
             <div className="flex justify-between"><dt className="text-mzd-gray">Pago</dt><dd className="num">{formatAOA(p.valores.pago)}</dd></div>
             <div className="flex justify-between font-semibold"><dt>Por pagar</dt><dd className="num">{formatAOA(p.valores.aPagar)}</dd></div>
+            {p.parqueamento && <div className="flex justify-between text-mzd-gray"><dt>Parqueamento (à parte)</dt><dd className="num">{formatAOA(p.parqueamento.valor)}</dd></div>}
           </dl>
           {p.valores.fatura && <p className="num mt-2 text-xs text-mzd-gray">Fatura {p.valores.fatura}</p>}
         </Seccao>
@@ -241,7 +295,7 @@ function Conteudo({ p, token }: { p: PortalProcesso; token: string }) {
       {o && !porDecidir && o.estado === 'aprovado' && (
         <details className="group rounded-lg border border-linha bg-white px-5 py-4">
           <summary className="cursor-pointer list-none text-[15px] font-extrabold text-mzd-black">
-            Orçamento aprovado <span className="num ml-1 text-sm font-normal text-mzd-gray">{formatAOA(totalDe(o).total)}</span>
+            Orçamento aceite <span className="num ml-1 text-sm font-normal text-mzd-gray">{formatAOA(totalDe(o).total)}</span>
             <span className="float-right text-xs font-semibold text-mzd-gray group-open:hidden">Ver detalhe</span>
           </summary>
           <div className="mt-3"><LinhasOrcamento orcamento={o} /></div>

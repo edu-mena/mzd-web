@@ -9,11 +9,12 @@ import { diaISO } from '../../lib/datas';
 const CAMPO = 'h-12 w-full rounded-[3px] border border-linha-forte bg-white px-3.5 text-[15px] text-mzd-black outline-none transition-colors placeholder:text-zinc-500 hover:border-zinc-500 focus:border-mzd-black focus:ring-1 focus:ring-mzd-black';
 
 /**
- * Pedido de serviço/orçamento. O modelo e o serviço podem vir escolhidos de outras secções da página.
- * Não cria cliente nem marcação: chega à receção, que liga e decide.
+ * Pedido de serviço/orçamento. A viatura (marca e modelo, qualquer marca) e o serviço podem vir escolhidos
+ * de outras secções da página. Não cria cliente nem marcação: chega à receção, que liga e decide.
  */
-export default function FormPedido({ modelos, servicos, modelo, setModelo, servico, setServico }: {
-  modelos: string[];
+export default function FormPedido({ sugestoes, servicos, modelo, setModelo, servico, setServico }: {
+  /** Sugestões para a viatura: marcas e modelos da especialidade. */
+  sugestoes: string[];
   servicos: string[];
   modelo: string;
   setModelo: (v: string) => void;
@@ -68,24 +69,11 @@ export default function FormPedido({ modelos, servicos, modelo, setModelo, servi
         <label>Não preencher <input tabIndex={-1} autoComplete="off" value={d.site} onChange={(e) => setD({ ...d, site: e.target.value })} /></label>
       </div>
 
-      <fieldset>
-        <legend className="text-[13px] font-semibold text-mzd-black">Que Mitsubishi tem?</legend>
-        <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Modelo">
-          {[...modelos, 'Outro'].map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={modelo === m}
-              onClick={() => setModelo(modelo === m ? '' : m)}
-              className={clsx('h-9 rounded-full border px-3.5 text-[13px] font-semibold transition-colors',
-                modelo === m ? 'border-mzd-black bg-mzd-black text-white' : 'border-linha-forte bg-white text-mzd-black hover:border-mzd-black')}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <label className="block">
+        <span className="mb-1.5 block text-[13px] font-semibold text-mzd-black">Marca e modelo da viatura</span>
+        <input className={CAMPO} value={modelo} onChange={(e) => setModelo(e.target.value)} list="sugestoes-viatura" maxLength={60} placeholder="Ex.: Toyota Hilux, Hyundai Tucson, Mitsubishi Pajero" autoComplete="off" />
+        <datalist id="sugestoes-viatura">{sugestoes.map((x) => <option key={x} value={x} />)}</datalist>
+      </label>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="block">

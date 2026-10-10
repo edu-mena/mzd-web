@@ -70,6 +70,56 @@ export function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className="mb-3 border-l-4 border-mzd-red pl-2 text-xs font-extrabold uppercase tracking-wide text-mzd-black">{children}</h2>;
 }
 
+/** Contas para pagamento por transferência (a Direção define-as em Definições). */
+export function CoordenadasPagamento({ referencia }: { referencia?: string }) {
+  const { data: config } = useConfiguracao();
+  const contas = config?.coordenadasPagamento ?? [];
+  if (!contas.length) return null;
+  return (
+    <section className="mt-6 break-inside-avoid">
+      <SectionTitle>Coordenadas de Pagamento</SectionTitle>
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 text-left text-[10px] font-bold uppercase text-mzd-gray">
+            <th className="py-1.5">Banco</th>
+            <th className="py-1.5">Titular</th>
+            <th className="py-1.5">IBAN</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contas.map((c) => (
+            <tr key={c.id} className="border-b border-zinc-100 align-top">
+              <td className="py-1.5 pr-3">{c.banco}</td>
+              <td className="py-1.5 pr-3">{c.titular}</td>
+              <td className="num py-1.5">{c.iban}{c.conta && <span className="block text-[11px] text-mzd-gray">Conta {c.conta}</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-mzd-gray">
+        Também aceitamos TPA, Multicaixa Express e numerário na oficina.
+        {config?.instrucoesPagamento && <> {config.instrucoesPagamento}</>}
+        {referencia && <> Referência: <span className="num font-semibold text-mzd-black">{referencia}</span>.</>}
+      </p>
+    </section>
+  );
+}
+
+/** Linha do IVA nos totais: taxa, ou "isento" quando o documento é sem IVA. */
+export function LinhaIva({ taxa, isencao, valor }: { taxa: number; isencao?: string; valor: ReactNode }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-mzd-gray">{isencao ? 'IVA (isento)' : `IVA (${taxa}%)`}</span>
+      <span>{valor}</span>
+    </div>
+  );
+}
+
+/** Motivo legal de um documento sem IVA. */
+export function NotaIsencao({ isencao }: { isencao?: string }) {
+  return isencao ? <p className="mt-2 text-right text-[11px] text-mzd-gray">Motivo da isenção de IVA: {isencao}</p> : null;
+}
+
 /** Linha de assinatura; com `anexoId`, mostra a assinatura recolhida no ecrã por cima da linha. */
 export function SignatureLine({ label, processoId, anexoId }: { label: string; processoId?: string; anexoId?: string }) {
   const { data: anexos = [] } = useAnexos(processoId ?? '', !!anexoId);

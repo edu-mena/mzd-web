@@ -5,9 +5,8 @@ import { ArrowLeft, ArrowRight, Check, Plus, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { useClientes, useCriarProcesso, useMarcacao, useProcessos, useViatura, useViaturas } from '../api/hooks';
 import { Carregando } from '../components/ui/Estados';
-import { api } from '../api/endpoints';
 import type { NovoProcesso as DadosNovoProcesso } from '../api/endpoints';
-import type { ClienteResumo, ItemDano, Marcacao, ViaturaResumo } from '../types';
+import type { ClienteResumo, Marcacao, ViaturaResumo } from '../types';
 import { TIPO_MARCACAO_LABEL } from '../types';
 import { horaCurta } from '../lib/datas';
 import { ESTADO_LABEL, estaAtivo } from '../types';
@@ -15,17 +14,15 @@ import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import Matricula from '../components/ui/Matricula';
-import MapaDanos from '../components/ui/MapaDanos';
-import SignaturePad from '../components/ui/SignaturePad';
 import { Aviso } from '../components/ui/Controls';
-import { Checkbox, Escolha, Field, Input, Textarea } from '../components/ui/Form';
-import { MiniaturaPendente, SeletorFicheiros } from '../components/ui/Anexos';
-import type { FicheiroPendente } from '../components/ui/Anexos';
+import { Checkbox, Field, Input, Textarea } from '../components/ui/Form';
 import { useToast } from '../components/ui/toast-context';
 import { mensagemErro } from '../lib/erros';
 import { formatDate } from '../lib/format';
 
-const PASSOS = ['Viatura e cliente', 'Queixa e prazo', 'Estado de entrada', 'Revisão e assinatura'];
+// O estado de entrada (km, combustível, danos, pertences) não se regista aqui: o mecânico verifica-o com
+// o cliente na ficha de entrada em papel, que se imprime a seguir e se digitaliza depois de assinada.
+const PASSOS = ['Viatura e cliente', 'Queixa e prazo'];
 const QUEIXAS_FREQUENTES = ['Revisão periódica', 'Ruído ao travar', 'Luz de avaria acesa', 'Ar condicionado não arrefece', 'Fuga de óleo', 'Vibração em andamento'];
 
 const normalizar = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -45,13 +42,6 @@ interface Estado {
   queixa: string;
   prazo: string;
   urgente: boolean;
-  km: string;
-  combustivel: number;
-  bateria?: 'boa' | 'fraca' | 'a_testar';
-  pertences: string;
-  danos: ItemDano[];
-  fotos: FicheiroPendente[];
-  assinatura: Blob | null;
 }
 
 const INICIAL: Estado = {
@@ -62,12 +52,6 @@ const INICIAL: Estado = {
   queixa: '',
   prazo: emDias(3),
   urgente: false,
-  km: '',
-  combustivel: 50,
-  pertences: '',
-  danos: [],
-  fotos: [],
-  assinatura: null,
 };
 
 /**
@@ -135,14 +119,6 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
       if (e.queixa.trim().length < 5) r.queixa = 'Descreva o problema relatado pelo cliente.';
       if (!e.prazo || e.prazo < emDias(0)) r.prazo = 'O prazo tem de ser hoje ou depois.';
     }
-    if (n === 2) {
-      const km = Number(e.km);
-      const minimo = e.viatura?.km ?? 0;
-      if (e.km === '' || !Number.isInteger(km) || km < 0) r.km = 'Indique a quilometragem do conta-quilómetros.';
-      else if (km < minimo) r.km = `Não pode ser inferior à última registada (${minimo.toLocaleString('pt-PT')} km).`;
-      if (!e.bateria) r.bateria = 'Indique o estado da bateria.';
-    }
-    if (n === 3 && !e.assinatura) r.assinatura = 'O cliente tem de assinar a ficha de receção.';
     return r;
   }
 
@@ -153,19 +129,12 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
   }
 
   async function abrirProcesso() {
-    const r = validar(3);
+    const r = validar(1);
     setErros(r);
     if (Object.keys(r).length) return;
 
     const dados: DadosNovoProcesso = {
-      ficha: {
-        queixaCliente: e.queixa.trim(),
-        km: Number(e.km),
-        combustivel: e.combustivel,
-        bateria: e.bateria!,
-        danos: e.danos,
-        pertences: e.pertences.trim(),
-      },
+      ficha: { queixaCliente: e.queixa.trim() },
       prazoEntrega: new Date(`${e.prazo}T18:00:00`).toISOString(),
       urgente: e.urgente,
       marcacaoId: marcacao?.id,
@@ -189,14 +158,7 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
     try {
       setProgresso('A abrir o processo…');
       const processo = await criar.mutateAsync(dados);
-      // Fotos e assinatura só podem ser enviadas depois de o processo existir.
-      for (const [i, f] of e.fotos.entries()) {
-        setProgresso(`A enviar fotografias (${i + 1} de ${e.fotos.length})…`);
-        await api.anexos.enviar(processo.id, f.ficheiro, { tipo: f.tipo, legenda: 'Receção', nome: f.nome });
-      }
-      setProgresso('A guardar a assinatura…');
-      await api.anexos.enviar(processo.id, e.assinatura!, { tipo: 'assinatura', finalidade: 'assinatura_recepcao', nome: 'assinatura-recepcao.png' });
-      toast(`Processo ${processo.numero} aberto`);
+      toast(`Processo ${processo.numero} aberto — imprima a ficha de entrada para o mecânico`);
       navigate(`/processos/${processo.id}`, { replace: true });
     } catch (err) {
       setProgresso(null);
@@ -211,10 +173,10 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
         titulo="Nova receção"
         descricao={marcacao
           ? <>Marcação de <strong className="text-mzd-black">{marcacao.nome}</strong> às <span className="num">{horaCurta(marcacao.data)}</span> · {TIPO_MARCACAO_LABEL[marcacao.tipo]}{marcacao.notas ? ` · “${marcacao.notas}”` : ''}</>
-          : 'Abre o processo e regista o estado em que a viatura entra na oficina'}
+          : 'Abre o processo com a queixa do cliente. O estado da viatura fica na ficha de entrada, preenchida pelo mecânico com o cliente.'}
       />
 
-      <ol className="grid grid-cols-4 gap-2" aria-label="Passos">
+      <ol className="grid grid-cols-2 gap-2" aria-label="Passos">
         {PASSOS.map((nome, i) => (
           <li key={nome} aria-current={i === passo ? 'step' : undefined}>
             <span className={clsx('block h-[5px] rounded-[1px]', i < passo ? 'bg-mzd-black' : i === passo ? 'bg-mzd-red' : 'bg-zinc-200')} />
@@ -226,8 +188,6 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
 
       {passo === 0 && <PassoViatura e={e} atualizar={atualizar} erros={erros} processoAtivo={processoAtivo ? `${processoAtivo.numero} · ${ESTADO_LABEL[processoAtivo.estado]}` : undefined} />}
       {passo === 1 && <PassoQueixa e={e} atualizar={atualizar} erros={erros} />}
-      {passo === 2 && <PassoEstado e={e} atualizar={atualizar} erros={erros} />}
-      {passo === 3 && <PassoRevisao e={e} atualizar={atualizar} erros={erros} />}
 
       <div className="sticky bottom-0 -mx-4 flex items-center justify-between gap-3 border-t border-linha bg-papel/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
         <Button variante="secundario" icone={<ArrowLeft size={15} />} onClick={() => { setErros({}); setPasso((p) => p - 1); }} disabled={passo === 0 || !!progresso}>
@@ -237,7 +197,7 @@ function Assistente({ viaturaInicial, marcacao }: { viaturaInicial?: ViaturaResu
         {passo < PASSOS.length - 1 ? (
           <Button onClick={seguinte}>Seguinte <ArrowRight size={15} /></Button>
         ) : (
-          <Button variante="perigo" icone={<Check size={15} />} onClick={abrirProcesso} carregando={!!progresso}>Abrir processo</Button>
+          <Button icone={<Check size={15} />} onClick={abrirProcesso} carregando={!!progresso}>Abrir processo</Button>
         )}
       </div>
     </div>
@@ -288,7 +248,7 @@ function PassoViatura({ e, atualizar, erros, processoAtivo }: PassoProps & { pro
               <ul className="divide-y divide-linha/70 rounded-md border border-linha bg-white">
                 {resultados.map((v) => (
                   <li key={v.id}>
-                    <button type="button" onClick={() => atualizar({ viatura: v, km: '' })} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50">
+                    <button type="button" onClick={() => atualizar({ viatura: v })} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50">
                       <Matricula valor={v.matricula} tamanho="sm" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-semibold text-mzd-black">{v.marca} {v.modelo}</span>
@@ -391,7 +351,17 @@ function NovaViatura({ e, atualizar, erros }: PassoProps) {
 }
 
 function PassoQueixa({ e, atualizar, erros }: PassoProps) {
+  const matricula = e.viatura?.matricula ?? e.novaViatura.matricula;
+  const viatura = e.viatura ? `${e.viatura.marca} ${e.viatura.modelo}` : `${e.novaViatura.marca} ${e.novaViatura.modelo}`;
+  const cliente = e.viatura?.cliente.nome ?? e.cliente?.nome ?? e.novoCliente.nome;
   return (
+    <div className="space-y-4">
+    <Card>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 px-5 py-4">
+        <Linha label="Viatura"><span className="flex flex-wrap items-center gap-2"><Matricula valor={matricula} tamanho="sm" />{viatura}</span></Linha>
+        <Linha label="Cliente">{cliente}</Linha>
+      </dl>
+    </Card>
     <Card>
       <CardHeader title="O que o cliente relata" subtitle="Escreva nas palavras do cliente — é o ponto de partida do diagnóstico" />
       <div className="space-y-5 px-5 py-5">
@@ -423,92 +393,14 @@ function PassoQueixa({ e, atualizar, erros }: PassoProps) {
         </Checkbox>
       </div>
     </Card>
-  );
-}
-
-function PassoEstado({ e, atualizar, erros }: PassoProps) {
-  const [errosFotos, setErrosFotos] = useState<string[]>([]);
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader title="Como a viatura entra" />
-        <div className="grid grid-cols-1 gap-5 px-5 py-5 sm:grid-cols-2">
-          <Field label="Quilometragem (km)" erro={erros.km} hint={e.viatura ? `Último registo: ${e.viatura.km.toLocaleString('pt-PT')} km` : undefined}>
-            {(a) => <Input {...a} value={e.km} onChange={(ev) => atualizar({ km: ev.target.value.replace(/\D/g, '') })} inputMode="numeric" className="num text-base" autoFocus />}
-          </Field>
-          <div>
-            <label htmlFor="combustivel" className="mb-1 flex justify-between text-xs font-semibold text-mzd-black">
-              Combustível <span className="num">{e.combustivel}%</span>
-            </label>
-            <input id="combustivel" type="range" min={0} max={100} step={5} value={e.combustivel} onChange={(ev) => atualizar({ combustivel: Number(ev.target.value) })} className="h-10 w-full accent-mzd-black" />
-            <div className="num flex justify-between text-[10.5px] text-mzd-gray"><span>Vazio</span><span>¼</span><span>½</span><span>¾</span><span>Cheio</span></div>
-          </div>
-          <div>
-            <Escolha
-              label="Bateria"
-              valor={e.bateria}
-              onChange={(b) => atualizar({ bateria: b })}
-              opcoes={[{ valor: 'boa', label: 'Boa', tom: 'ok' }, { valor: 'fraca', label: 'Fraca', tom: 'aviso' }, { valor: 'a_testar', label: 'A testar' }]}
-            />
-            {erros.bateria && <p className="mt-1 text-xs text-sinal-vermelho">{erros.bateria}</p>}
-          </div>
-          <Field label="Pertences deixados na viatura" hint="Ex.: documentos, triângulo, óculos">
-            {(a) => <Input {...a} value={e.pertences} onChange={(ev) => atualizar({ pertences: ev.target.value })} placeholder="Nenhum" />}
-          </Field>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="Danos visíveis" subtitle="Toque na viatura onde está cada risco ou mossa. Protege a oficina e o cliente." />
-        <div className="px-5 py-5"><MapaDanos danos={e.danos} onChange={(d) => atualizar({ danos: d })} /></div>
-      </Card>
-
-      <Card>
-        <CardHeader title="Fotografias de entrada" subtitle="Recomendado: as quatro faces da viatura, o painel com os quilómetros e cada dano" />
-        <div className="space-y-3 px-5 py-5">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-            {e.fotos.map((f) => (
-              <MiniaturaPendente key={f.id} f={f} onRemover={() => atualizar({ fotos: e.fotos.filter((x) => x.id !== f.id) })} />
-            ))}
-          </div>
-          <SeletorFicheiros onEscolher={(novos, err) => { setErrosFotos(err); atualizar({ fotos: [...e.fotos, ...novos] }); }} />
-          {errosFotos.map((m) => <p key={m} className="text-xs text-sinal-vermelho">{m}</p>)}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function PassoRevisao({ e, atualizar, erros }: PassoProps) {
-  const matricula = e.viatura?.matricula ?? e.novaViatura.matricula;
-  const viatura = e.viatura ? `${e.viatura.marca} ${e.viatura.modelo}` : `${e.novaViatura.marca} ${e.novaViatura.modelo}`;
-  const cliente = e.viatura?.cliente.nome ?? e.cliente?.nome ?? e.novoCliente.nome;
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader title="Confirme com o cliente" />
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-5 sm:grid-cols-3">
-          <Linha label="Viatura"><span className="flex flex-wrap items-center gap-2"><Matricula valor={matricula} tamanho="sm" />{viatura}</span></Linha>
-          <Linha label="Cliente">{cliente}</Linha>
-          <Linha label="Prazo prometido"><span className="num">{formatDate(`${e.prazo}T12:00:00`)}</span>{e.urgente && <span className="rotulo ml-2 !text-sinal-vermelho">Urgente</span>}</Linha>
-          <Linha label="Quilometragem"><span className="num">{Number(e.km).toLocaleString('pt-PT')} km</span></Linha>
-          <Linha label="Combustível / bateria"><span className="num">{e.combustivel}%</span> · {e.bateria === 'boa' ? 'Boa' : e.bateria === 'fraca' ? 'Fraca' : 'A testar'}</Linha>
-          <Linha label="Danos · fotos">{e.danos.length} assinalado(s) · {e.fotos.length} ficheiro(s)</Linha>
-          <div className="col-span-2 sm:col-span-3">
-            <Linha label="Queixa">“{e.queixa.trim()}”</Linha>
-          </div>
-          <div className="col-span-2 sm:col-span-3">
-            <Linha label="Pertences">{e.pertences.trim() || 'Nenhum'}</Linha>
-          </div>
-        </dl>
-      </Card>
-      <Card>
-        <CardHeader title="Assinatura do cliente" subtitle="O cliente confirma o estado de entrada descrito acima e autoriza o diagnóstico" />
-        <div className="px-5 py-5">
-          <SignaturePad onChange={(b) => atualizar({ assinatura: b })} legenda={`Assinatura de ${cliente || 'cliente'}`} />
-          {erros.assinatura && <p className="mt-1 text-xs text-sinal-vermelho">{erros.assinatura}</p>}
-        </div>
-      </Card>
+    <Aviso tom="neutro">
+      <p className="font-semibold">A seguir</p>
+      <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+        <li>Imprima a ficha de entrada (botão no processo) e entregue-a ao mecânico.</li>
+        <li>O mecânico verifica a viatura com o cliente, preenche a ficha e o cliente assina.</li>
+        <li>Digitalize a ficha assinada e carregue-a no processo, com os quilómetros.</li>
+      </ol>
+    </Aviso>
     </div>
   );
 }

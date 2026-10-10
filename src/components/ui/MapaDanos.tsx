@@ -44,16 +44,18 @@ function Silhueta({ vista }: { vista: ItemDano['vista'] }) {
 
 /**
  * Mapa de danos visíveis na receção: toque na viatura para marcar riscos, mossas ou outros danos.
- * Em modo só de leitura (documentos) mostra apenas as marcas.
+ * Em modo só de leitura (documentos) mostra apenas as marcas; `emBranco` é para a ficha em papel.
  */
 export default function MapaDanos({
   danos,
   onChange,
   soLeitura,
+  emBranco,
 }: {
   danos: ItemDano[];
   onChange?: (danos: ItemDano[]) => void;
   soLeitura?: boolean;
+  emBranco?: boolean;
 }) {
   const [tipo, setTipo] = useState<ItemDano['tipo']>('risco');
 
@@ -124,7 +126,7 @@ export default function MapaDanos({
           ))}
         </ol>
       )}
-      {danos.length === 0 && soLeitura && <p className="mt-2 text-xs text-mzd-gray">Sem danos visíveis assinalados.</p>}
+      {danos.length === 0 && soLeitura && !emBranco && <p className="mt-2 text-xs text-mzd-gray">Sem danos visíveis assinalados.</p>}
     </div>
   );
 }

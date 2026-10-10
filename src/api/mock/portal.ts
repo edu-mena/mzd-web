@@ -7,18 +7,21 @@
 // - Limitar pedidos por IP nas rotas /portal (ex.: 30/min) para impedir a adivinhação de tokens.
 // - A resposta é uma projeção própria (PortalProcesso): nada de custos, notas internas, nomes da equipa
 //   nem histórico interno. Fotografias só as da viatura (nunca assinaturas nem comprovativos).
-// - Aprovação: só com o processo à espera de aprovação, orçamento dentro da validade, nome de quem
-//   aprova e aceitação expressa. Fica registada com o método "portal" (o PHP guarda também IP e user agent).
+// - Aprovação: só com o processo à espera de aprovação, nome de quem aprova e aceitação expressa das
+//   condições. Depois da validade continua possível (conta parqueamento até ao dia da decisão).
+//   Fica registada com o método "portal" (o PHP guarda também IP e user agent).
 
 import { ApiError } from '../client';
 import type { Metodo } from '../client';
 import { db, guardar } from './db';
 import type { Handler } from './contexto';
 import { auditar, exigir, novoAcessoPortal, obterProcesso, texto, umDe } from './contexto';
+import { diaLocal } from './financeiro';
 import { aprovarOrcamento, decidirAdicional, recusarOrcamento } from './processos';
 import type { AutorAcao } from './processos';
 import { notificar } from './comunicacoes';
-import { emDivida, recebidoProcesso, totalFaturavel } from '../../lib/calculos';
+import { calcularTotais, emDivida, faltaPagamentoAceitacao, recebidoProcesso, saldoEmAberto, totalFaturavel, valorAceitacao } from '../../lib/calculos';
+import { aceitarAte, levantarAte, parqueamentoPorFaturar, valorParqueamento } from '../../lib/parqueamento';
 import { ESTADOS_ORDEM } from '../../types';
 import type { EstadoProcesso, PortalProcesso, Processo } from '../../types';
 
@@ -34,17 +37,23 @@ function porToken(token: string): Processo {
   return p;
 }
 
-const validoAte = (p: Processo) => {
-  const o = p.orcamento;
-  if (!o?.enviadoEm) return undefined;
-  return new Date(new Date(o.enviadoEm).getTime() + o.validadeDias * 86400000).toISOString();
-};
-
-const linhas = (o: { pecas: { descricao: string; quantidade: number; precoUnitario: number }[]; maoObra: { descricao: string; horas: number; valorHora: number }[]; taxaIva: number }) => ({
+const linhas = (o: { pecas: { descricao: string; quantidade: number; precoUnitario: number }[]; maoObra: { descricao: string; horas: number; valorHora: number }[]; taxaIva: number; isencaoIva?: string }) => ({
   pecas: o.pecas.map(({ descricao, quantidade, precoUnitario }) => ({ descricao, quantidade, precoUnitario })),
   maoObra: o.maoObra.map(({ descricao, horas, valorHora }) => ({ descricao, horas, valorHora })),
   taxaIva: o.taxaIva,
+  isencaoIva: o.isencaoIva,
 });
+
+/** Parqueamento a contar (ainda por faturar) e faturas de parqueamento por pagar, com IVA. */
+function parqueamentoDoCliente(p: Processo): PortalProcesso['parqueamento'] {
+  const porFaturar = parqueamentoPorFaturar(p);
+  const v = valorParqueamento(porFaturar, p.orcamento);
+  const faturas = (p.faturasParqueamento ?? []).filter((f) => saldoEmAberto(f) > 0);
+  const valor = v.total + faturas.reduce((s, f) => s + saldoEmAberto(f), 0);
+  if (!valor) return undefined;
+  const desde = [...porFaturar.map((x) => x.de), ...faturas.flatMap((f) => f.periodos.map((x) => x.de))].sort()[0];
+  return { valorDia: v.valorDia || (faturas[0]?.valorDia ?? 0), dias: v.dias + faturas.reduce((s, f) => s + f.periodos.reduce((d, x) => d + x.dias, 0), 0), valor, desde };
+}
 
 export function projetar(p: Processo): PortalProcesso {
   const base = db();
@@ -56,7 +65,8 @@ export function projetar(p: Processo): PortalProcesso {
   p.historico.forEach((h) => { if (h.estado && h.estado !== 'cancelado' && !etapas.has(h.estado)) etapas.set(h.estado, h.data); });
   const o = p.orcamento;
   const mostrarOrcamento = o && o.estado !== 'rascunho' && visivel(p.estado);
-  const fim = validoAte(p);
+  const fim = aceitarAte(o);
+  const aceitacao = valorAceitacao(o);
   const tarefas = p.tarefas ?? [];
   const comValores = !!o && o.estado === 'aprovado';
 
@@ -68,7 +78,10 @@ export function projetar(p: Processo): PortalProcesso {
     aguardaPecas: !!p.aguardaPecas,
     cliente: { nome: c.nome },
     viatura: { matricula: v.matricula, marca: v.marca, modelo: v.modelo },
-    oficina: { nome: empresa.nome, telefone: empresa.telefone, email: empresa.email, morada: empresa.morada, iban: empresa.iban },
+    oficina: {
+      nome: empresa.nome, telefone: empresa.telefone, email: empresa.email, morada: empresa.morada,
+      coordenadas: base.configuracao.coordenadasPagamento, instrucoesPagamento: base.configuracao.instrucoesPagamento,
+    },
     queixa: p.fichaRecepcao.queixaCliente,
     etapas: [...etapas].map(([estado, data]) => ({ estado, data })),
     // O diagnóstico só se mostra com o orçamento (são aprovados juntos).
@@ -82,15 +95,21 @@ export function projetar(p: Processo): PortalProcesso {
       validadeDias: o.validadeDias,
       condicoesPagamento: o.condicoesPagamento,
       enviadoEm: o.enviadoEm,
-      validoAte: fim,
-      expirado: o.estado === 'enviado' && !!fim && Date.now() > new Date(fim).getTime(),
+      validoAte: fim && `${fim}T12:00:00`,
+      expirado: o.estado === 'enviado' && !!fim && diaLocal(new Date()) > fim,
       estado: o.estado,
       descontoPct: o.desconto?.estado === 'aprovado' ? o.desconto.percentagem : undefined,
+      condicoes: o.condicoes,
+      pagamentoAceitacao: aceitacao,
+      pagamentoLevantamento: Math.max(0, Math.round((calcularTotais(o).total - aceitacao) * 100) / 100),
     } : undefined,
     autorizacao: p.autorizacao && { data: p.autorizacao.data, metodo: p.autorizacao.metodo, autorizadoPor: p.autorizacao.autorizadoPor },
     adicionais: (p.orcamentosAdicionais ?? []).map((a) => ({ id: a.id, justificacao: a.justificacao, criadoEm: a.criadoEm, estado: a.estado, ...linhas(a) })),
     progresso: tarefas.length && ['em_reparacao', 'controlo_qualidade'].includes(p.estado) ? { feitas: tarefas.filter((t) => t.feita).length, total: tarefas.length } : undefined,
     valores: comValores ? { total: totalFaturavel(p), pago: recebidoProcesso(p), aPagar: emDivida(p), fatura: p.fatura?.numero } : undefined,
+    aguardaPagamentoAceitacao: p.estado === 'em_reparacao' && faltaPagamentoAceitacao(p) > 0 ? faltaPagamentoAceitacao(p) : undefined,
+    levantarAte: p.estado === 'pronta_entrega' ? levantarAte(p) : undefined,
+    parqueamento: parqueamentoDoCliente(p),
     entregueEm: p.entrega?.data,
     canceladoEm: p.cancelamento?.data,
     fotos: base.anexos.filter((a) => a.processoId === p.id && (a.tipo === 'foto' || a.tipo === 'video') && !a.finalidade),
@@ -123,17 +142,13 @@ export const rotasPortal: [Metodo, string, Handler][] = [
     if (p.estado !== 'aguarda_aprovacao') throw new ApiError(422, 'Este orçamento já não está à espera de aprovação. Atualize a página.');
     const decisao = umDe(body?.decisao, ['aprovado', 'recusado'] as const, 'Decisão');
     const nome = exigirAceitacao(body);
-    const fim = validoAte(p);
-    if (decisao === 'aprovado' && fim && Date.now() > new Date(fim).getTime()) {
-      throw new ApiError(422, 'A validade deste orçamento terminou. Contacte a oficina para o confirmar.');
-    }
     const ref = `${p.numero} · ${db().viaturas.find((v) => v.id === p.viaturaId)?.matricula}`;
     if (decisao === 'recusado') {
       recusarOrcamento(p, autorCliente(nome), texto(body?.motivo, 'Motivo', 3, 300));
       notificar({ perfis: [...balcao] }, 'Orçamento recusado no portal', `${ref} — ${nome}: ${p.orcamento!.motivoRecusa}`, `/processos/${p.id}`);
     } else {
+      // O aviso à receção (falta o pagamento da aceitação) sai com a mudança de etapa.
       aprovarOrcamento(p, autorCliente(nome), { metodo: 'portal', autorizadoPor: nome });
-      notificar({ perfis: ['rececionista', 'administrativa'] }, 'Orçamento aprovado no portal', `${ref} — aprovado por ${nome}.`, `/processos/${p.id}`);
     }
     auditar(null, `portal_${decisao}`, 'processo', p.id, nome);
     guardar();

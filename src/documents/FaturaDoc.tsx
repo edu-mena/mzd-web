@@ -1,6 +1,6 @@
 import type { ProcessoDetalhado } from '../types';
 import { FORMA_PAGAMENTO_LABEL } from '../types';
-import DocumentShell, { Field, SectionTitle } from './DocumentShell';
+import DocumentShell, { CoordenadasPagamento, Field, LinhaIva, NotaIsencao, SectionTitle } from './DocumentShell';
 import { formatAOA, formatDate } from '../lib/format';
 import { calcularTotais, saldoEmAberto, valorPago } from '../lib/calculos';
 import { useConfiguracao } from '../api/hooks';
@@ -72,8 +72,9 @@ export default function FaturaDoc({ processo }: { processo: ProcessoDetalhado })
           </>
         )}
         <div className="flex justify-between"><span className="text-mzd-gray">Total ilíquido</span><span>{formatAOA(totais.subtotal)}</span></div>
-        <div className="flex justify-between"><span className="text-mzd-gray">IVA ({o.taxaIva}%)</span><span>{formatAOA(totais.iva)}</span></div>
+        <LinhaIva taxa={o.taxaIva} isencao={o.isencaoIva} valor={formatAOA(totais.iva)} />
         <div className="flex justify-between border-t border-mzd-black pt-1.5 text-base font-extrabold"><span>Total</span><span>{formatAOA(fat.valorTotal)}</span></div>
+        <NotaIsencao isencao={o.isencaoIva} />
       </div>
 
       <SectionTitle>Pagamentos</SectionTitle>
@@ -106,6 +107,8 @@ export default function FaturaDoc({ processo }: { processo: ProcessoDetalhado })
         <div className="flex justify-between"><span className="text-mzd-gray">Total pago</span><span>{formatAOA(pago)}</span></div>
         <div className="flex justify-between font-bold"><span>Saldo em aberto</span><span className={saldo > 0 ? 'text-mzd-red' : ''}>{formatAOA(saldo)}</span></div>
       </div>
+      <CoordenadasPagamento referencia={fat.numero} />
+      <p className="mb-6 mt-3 text-xs text-mzd-gray">O parqueamento, quando existe, é faturado à parte.</p>
 
       <SectionTitle>Termo de Garantia</SectionTitle>
       <table className="w-full border-collapse text-sm">

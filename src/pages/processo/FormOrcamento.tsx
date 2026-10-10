@@ -4,7 +4,9 @@ import { api } from '../../api/endpoints';
 import type { ItemOrcamentoMaoObra, ItemOrcamentoPeca, ProcessoDetalhado } from '../../types';
 import Drawer from '../../components/ui/Drawer';
 import Button from '../../components/ui/Button';
-import { Field, Input, Textarea } from '../../components/ui/Form';
+import { Escolha, Field, Input, Textarea } from '../../components/ui/Form';
+import Kz from '../../components/ui/Kz';
+import { calcularTotais, textoCondicoes, valorAceitacao } from '../../lib/calculos';
 import { Aviso } from '../../components/ui/Controls';
 import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
@@ -18,8 +20,8 @@ export function FormOrcamento({ processo, onFechar }: { processo: ProcessoDetalh
   const { data: config } = useConfiguracao();
   const o = processo.orcamento;
   const [linhas, setLinhas] = useState<{ pecas: ItemOrcamentoPeca[]; maoObra: ItemOrcamentoMaoObra[] }>({ pecas: o?.pecas ?? [], maoObra: o?.maoObra ?? [] });
-  const [validade, setValidade] = useState(String(o?.validadeDias ?? config?.validadeOrcamentoDias ?? 15));
-  const [condicoes, setCondicoes] = useState(o?.condicoesPagamento ?? '50% na aprovação, 50% na entrega');
+  const [iva, setIva] = useState<'com' | 'sem'>(o?.isencaoIva ? 'sem' : 'com');
+  const [motivoIsencao, setMotivoIsencao] = useState(o?.isencaoIva ?? '');
   const { can } = useAuth();
   const [descontoPct, setDescontoPct] = useState(String(o?.desconto && o.desconto.estado !== 'recusado' ? o.desconto.percentagem : ''));
   const [descontoMotivo, setDescontoMotivo] = useState(o?.desconto?.motivo ?? '');
@@ -27,12 +29,20 @@ export function FormOrcamento({ processo, onFechar }: { processo: ProcessoDetalh
   const limite = config?.descontoMaximoPct ?? 5;
   const precisaAprovacao = pct > limite && !can('financeiro.supervisionar');
   const problemas = processo.diagnostico?.itens.filter((i) => i.estado !== 'ok') ?? [];
+  const taxaIva = iva === 'sem' ? 0 : config?.taxaIva ?? 14;
+  const condicoes = config?.condicoes;
+  // Pré-visualização do que o cliente paga na aceitação (a mesma regra do servidor).
+  const descontoPrevisto = pct > 0 ? { percentagem: pct, estado: 'aprovado' as const, motivo: '', pedidoPorId: '', pedidoEm: '' } : undefined;
+  const previsao = condicoes && valorAceitacao({ ...linhas, taxaIva, condicoes, desconto: descontoPrevisto });
+  const total = calcularTotais({ ...linhas, taxaIva, desconto: descontoPrevisto }).total;
 
   function guardar() {
     acao.mutate(
       () => api.processos.guardarOrcamento(processo.id, {
-        ...linhas, validadeDias: Number(validade), condicoesPagamento: condicoes,
+        ...linhas,
         desconto: pct > 0 ? { percentagem: pct, motivo: descontoMotivo } : undefined,
+        semIva: iva === 'sem',
+        motivoIsencaoIva: iva === 'sem' ? motivoIsencao.trim() || undefined : undefined,
       }),
       {
         onSuccess: (p) => {
@@ -50,7 +60,7 @@ export function FormOrcamento({ processo, onFechar }: { processo: ProcessoDetalh
       onClose={onFechar}
       largura="lg"
       titulo="Orçamento"
-      subtitulo="Os valores são sem IVA; o IVA é acrescentado no total"
+      subtitulo={iva === 'sem' ? 'Orçamento sem IVA: o motivo da isenção sai na pró-forma e na fatura' : 'Os valores são sem IVA; o IVA é acrescentado no total'}
       rodape={
         <>
           <Button variante="fantasma" onClick={onFechar}>Cancelar</Button>
@@ -71,7 +81,20 @@ export function FormOrcamento({ processo, onFechar }: { processo: ProcessoDetalh
             </ul>
           </Aviso>
         )}
-        <EditorLinhas {...linhas} onChange={setLinhas} taxaIva={config?.taxaIva ?? 14} valorHora={config?.valorHora ?? 8500} descontoPct={pct} />
+        <EditorLinhas {...linhas} onChange={setLinhas} taxaIva={taxaIva} isento={iva === 'sem'} valorHora={config?.valorHora ?? 8500} descontoPct={pct} />
+        <section className="rounded-md border border-linha bg-white p-4">
+          <Escolha
+            label="IVA"
+            valor={iva}
+            onChange={setIva}
+            opcoes={[{ valor: 'com', label: `Com IVA (${config?.taxaIva ?? 14}%)` }, { valor: 'sem', label: 'Sem IVA', descricao: 'Pró-forma e fatura sem IVA' }]}
+          />
+          {iva === 'sem' && (
+            <Field label="Motivo da isenção (sai no documento)" hint={`Vazio = o das definições: «${config?.motivoIsencaoIva ?? 'Isento de IVA'}»`} className="mt-3">
+              {(a) => <Input {...a} value={motivoIsencao} onChange={(e) => setMotivoIsencao(e.target.value)} placeholder={config?.motivoIsencaoIva} maxLength={200} />}
+            </Field>
+          )}
+        </section>
         <section className="rounded-md border border-linha bg-white p-4">
           <h3 className="rotulo mb-2">Desconto</h3>
           {o?.desconto?.estado === 'recusado' && (
@@ -88,10 +111,21 @@ export function FormOrcamento({ processo, onFechar }: { processo: ProcessoDetalh
           </div>
           {precisaAprovacao && <p className="mt-2 text-xs font-semibold text-sinal-ambar">Acima de {limite}%: o orçamento só segue para o cliente depois de a Direção aprovar o desconto.</p>}
         </section>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[140px_1fr]">
-          <Field label="Validade (dias)">{(a) => <Input {...a} value={validade} onChange={(e) => setValidade(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="num" />}</Field>
-          <Field label="Condições de pagamento">{(a) => <Input {...a} value={condicoes} onChange={(e) => setCondicoes(e.target.value)} />}</Field>
-        </div>
+        {condicoes && (
+          <section className="rounded-md border border-linha bg-zinc-50/70 p-4 text-[13px]">
+            <h3 className="rotulo mb-2">Condições (definidas pela Direção)</h3>
+            <p className="text-mzd-black">{textoCondicoes(condicoes)}</p>
+            {total > 0 && previsao !== undefined && (
+              <p className="mt-1 text-mzd-gray">
+                Na aceitação: <Kz valor={previsao} className="font-semibold text-mzd-black" /> · no levantamento: <Kz valor={Math.max(0, total - previsao)} className="font-semibold text-mzd-black" />
+              </p>
+            )}
+            <p className="mt-1 text-mzd-gray">
+              Validade: {config?.validadeOrcamentoDias} dias depois do envio. Depois disso, e {condicoes.diasUteisLevantamento} dias úteis depois de avisado que a viatura está pronta,
+              conta parqueamento a <Kz valor={condicoes.parqueamentoDia} />/dia{taxaIva > 0 ? ' + IVA' : ''}.
+            </p>
+          </section>
+        )}
       </div>
     </Drawer>
   );

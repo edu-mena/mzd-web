@@ -59,6 +59,26 @@ src/
   (`ficheiro`, `tipo`, `finalidade?`, `legenda?`). O PHP valida o tipo real com `finfo`, o tamanho, re-codifica imagens
   e guarda **fora de `public_html`**; o `url` devolvido aponta para um endpoint PHP que verifica a sessão.
   Fotos chegam já comprimidas pelo navegador (máx. 1600 px). No modo simulado ficam no IndexedDB.
+- **Ficha de entrada em papel.** `POST /processos` só recebe a queixa e o prazo. O mecânico preenche com o cliente a ficha
+  impressa (`/processos/:id/imprimir/ficha`), o cliente assina e a receção digitaliza-a: anexos `finalidade=ficha_entrada`
+  (foto ou PDF) + `PUT /processos/:id/ficha-entrada` com `km` (obrigatório, não pode recuar), `combustivel?` e `pertences?`.
+  Sem ficha não se inicia o diagnóstico. Não há assinatura digital na receção nem na aceitação.
+- **Condições comerciais** (Definições → `condicoes`, copiadas para o orçamento quando é guardado): % das peças e da mão de obra
+  pagas na aceitação (100% / 60%), validade para aceitar (10 dias), parqueamento por dia (2 000 Kz, sem IVA) e dias úteis para
+  levantar (5). `valorAceitacao()` em [src/lib/calculos.ts](src/lib/calculos.ts) é a regra única do valor.
+- **Pagamento da aceitação.** Depois de aceite, a reparação só começa (tarefas, horas, conclusão) com esse valor recebido;
+  a Direção pode dispensá-lo (`POST /processos/:id/pagamento-aceitacao/dispensar`). O servidor devolve `aguardaPagamento`
+  em cada processo, também a quem não vê valores.
+- **Parqueamento** ([src/lib/parqueamento.ts](src/lib/parqueamento.ts)): conta por dia (inclusive) depois da validade do
+  orçamento até à decisão, e depois dos dias úteis a seguir ao aviso de "pronta" até ao levantamento (feriados nacionais
+  em [src/lib/datas.ts](src/lib/datas.ts) — confirmar a lista). O aviso regista-se ao enviar uma mensagem com a viatura pronta
+  ou com `POST /processos/:id/aviso-levantamento` (telefone/balcão). Fatura-se à parte (`POST …/parqueamento/faturar`,
+  numeração FT normal) e tem de estar paga antes da entrega; a Direção pode dispensar (`POST …/parqueamento/dispensar`).
+  Os pagamentos indicam a fatura (`fatura` = nº).
+- **Sem IVA**: `PUT /processos/:id/orcamento` com `semIva` (+ `motivoIsencaoIva`, por omissão o das Definições): taxa 0 e o
+  motivo sai na pró-forma e nas faturas; trabalhos adicionais e parqueamento seguem o mesmo regime.
+- **Coordenadas de pagamento** (Definições → `coordenadasPagamento`, IBAN angolano validado) saem na pró-forma, nas faturas
+  e no portal do cliente.
 - O ciclo do processo (receção → entrega) está todo em [src/api/mock/processos.ts](src/api/mock/processos.ts):
   cada rota documenta as validações e transições que o PHP tem de replicar.
 - Comunicações em [src/api/mock/comunicacoes.ts](src/api/mock/comunicacoes.ts): o **email** é enviado pelo PHP
@@ -98,8 +118,9 @@ ficheiros ocultos e de configuração e define cabeçalhos de segurança (HSTS e
 ## Site público
 
 `mzd.it.ao` abre o site da oficina para quem não tem sessão iniciada (com sessão, abre o painel); está sempre
-disponível em `/site`. Foco em Mitsubishi: modelos interativos, serviços, como funciona, galeria, testemunhos
-(só reais) e pedido de orçamento.
+disponível em `/site`. Oficina multimarca com especialidade Mitsubishi: abertura neutra ("Todas as marcas. Especialistas
+em Mitsubishi."), serviços para qualquer marca, faixa "Reparamos todas as marcas" (só nomes, sem logótipos), como funciona,
+a especialidade Mitsubishi (modelos interativos), galeria, testemunhos (só reais) e pedido de orçamento com marca e modelo livres.
 
 - **Gestão:** o administrador do sistema edita tudo em **Site** (`/gestao-site`, permissão `site.gerir`):
   textos, fotografias (enviadas e comprimidas no navegador), modelos, serviços, galeria, testemunhos, contactos
@@ -151,3 +172,4 @@ As contas reais criam-se na instalação do backend (fora do repositório, que �
 | F9 | Painéis por função, alertas "pede atenção", relatórios por período com comparação e CSV | ✅ |
 | F10 | Administração: contas da equipa, senha temporária obrigatória, auditoria com filtros, cópias de segurança, estado do sistema | ✅ |
 | F11 | Acabamento: WCAG 2.1 AA sem falhas (axe), teclado e foco, títulos, rede de segurança para erros, CSP, Ajuda por função | ✅ |
+| F12 | Pedidos da Direção (10/2026): fatura sem IVA, pagamento na aceitação (100% peças + 60% mão de obra), parqueamento, coordenadas de pagamento, ficha de entrada em papel, aceitação do orçamento explicada, site multimarca | ✅ |

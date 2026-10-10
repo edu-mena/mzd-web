@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pause, Play, PackageX } from 'lucide-react';
+import { Lock, Pause, Play, PackageX } from 'lucide-react';
 import clsx from 'clsx';
 import { useAcaoProcesso, useProcessos } from '../../api/hooks';
 import { api } from '../../api/endpoints';
@@ -135,9 +135,12 @@ export default function PainelMecanico() {
                   {p.aguardaPecas && (
                     <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-sinal-ambar"><PackageX size={13} /> À espera de peças: {p.notaPecas}</p>
                   )}
+                  {p.aguardaPagamento && (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-sinal-ambar"><Lock size={13} /> Não começar: o cliente ainda não fez o pagamento da aceitação.</p>
+                  )}
 
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
-                    {p.estado === 'em_reparacao' && !p.aguardaPecas && (
+                    {p.estado === 'em_reparacao' && !p.aguardaPecas && !p.aguardaPagamento && (
                       meuAqui
                         ? <Button variante="perigo" tamanho="sm" icone={<Pause size={14} />} onClick={() => cronometro(p, 'parar')}>Parar</Button>
                         : <Button variante="secundario" tamanho="sm" icone={<Play size={14} />} onClick={() => cronometro(p, 'iniciar')} disabled={!!ativo}>Iniciar trabalho</Button>

@@ -161,17 +161,21 @@ export const CREDITOS_FOTOGRAFIAS: { ficheiro: string; titulo: string; autor: st
 
 export const CONTEUDO_SITE_PADRAO: ConteudoSite = {
   hero: {
-    titulo: 'Especialistas em Mitsubishi.',
-    subtitulo: "Diagnóstico eletrónico, mecânica e tração 4x4 para Pajero, Pajero Sport, L200 e toda a gama. Só reparamos depois de aprovar o orçamento — e acompanha cada etapa pelo telemóvel.",
-    imagem: { url: '/imagens/site/hero.jpg', alt: "Mitsubishi Pajero nas dunas, com os faróis acesos", credito: "Darvin.wilson · CC BY-SA 4.0 · Wikimedia Commons · adaptada (fundo retocado)" },
+    titulo: 'Todas as marcas. Especialistas em Mitsubishi.',
+    subtitulo: "Diagnóstico eletrónico, revisões, travões, motor e 4x4 para a sua viatura, seja qual for a marca — com a experiência de quem conhece cada Mitsubishi por dentro. Só reparamos depois de aceitar o orçamento, e acompanha tudo pelo telemóvel.",
+    imagem: { url: '/imagens/site/galeria-oficina.jpg', alt: "Mecânico a trabalhar numa viatura na oficina", credito: "Igor Ovsyannykov igorovsyannykov · CC0 · Wikimedia Commons" },
   },
   destaques: [
-    { titulo: "Orçamento antes de tudo", texto: "Recebe o diagnóstico e o orçamento por escrito e decide. Nada é feito sem a sua aprovação." },
+    { titulo: "Orçamento antes de tudo", texto: "Recebe o diagnóstico e o orçamento por escrito e decide. Nada é feito sem a sua aceitação." },
     { titulo: "Acompanhamento online", texto: "Um link pessoal mostra em que etapa está a viatura, com fotografias do que encontrámos." },
-    { titulo: "Peças certas para Mitsubishi", texto: "Peças adequadas a cada modelo e motor, com garantia escrita nas peças e na mão de obra." },
+    { titulo: "Qualquer marca, com garantia", texto: "Peças adequadas a cada marca e motor, com garantia escrita nas peças e na mão de obra." },
+  ],
+  marcas: [
+    'Toyota', 'Mitsubishi', 'Nissan', 'Hyundai', 'Kia', 'Suzuki', 'Isuzu', 'Ford', 'Mazda', 'Honda',
+    'Volkswagen', 'Mercedes-Benz', 'BMW', 'Land Rover', 'Jeep', 'Chevrolet', 'Renault', 'Peugeot',
   ],
   modelos: [
-    { id: "pajero", nome: "Pajero", descricao: "O todo-o-terreno de referência. Super Select 4WD, suspensão e travões preparados para estrada e picada.", imagem: { url: '/imagens/site/modelo-pajero.jpg', alt: "Mitsubishi Pajero branco", credito: "RegionVisitor90 · CC0 · Wikimedia Commons" } },
+    { id: "pajero", nome: "Pajero", descricao: "O todo-o-terreno de referência. Super Select 4WD, suspensão e travões preparados para estrada e picada.", imagem: { url: '/imagens/site/hero.jpg', alt: "Mitsubishi Pajero nas dunas, com os faróis acesos", credito: "Darvin.wilson · CC BY-SA 4.0 · Wikimedia Commons · adaptada (fundo retocado)" } },
     { id: "pajero-sport", nome: "Pajero Sport", descricao: "Motores diesel 2.4 e 2.5, caixa automática e tração integral: revisões e diagnóstico completos.", imagem: { url: '/imagens/site/modelo-pajero-sport.jpg', alt: "Mitsubishi Pajero Sport branco", credito: "オーバードライブ83 · CC BY-SA 4.0 · Wikimedia Commons" } },
     { id: "l200", nome: "L200 / Triton", descricao: "A pick-up de trabalho: embraiagem, caixa de transferência, suspensão traseira e injeção diesel.", imagem: { url: '/imagens/site/modelo-l200.jpg', alt: "Mitsubishi L200 cinzenta", credito: "RL GNZLZ · CC BY-SA 2.0 · Wikimedia Commons" } },
     { id: "outlander", nome: "Outlander", descricao: "Revisões, ar condicionado, sistemas eletrónicos e travagem — incluindo versões híbridas.", imagem: { url: '/imagens/site/modelo-outlander.jpg', alt: "Mitsubishi Outlander branco", credito: "MercurySable99 · CC BY-SA 4.0 · Wikimedia Commons" } },
@@ -182,12 +186,11 @@ export const CONTEUDO_SITE_PADRAO: ConteudoSite = {
     { id: "diagnostico", titulo: "Diagnóstico eletrónico", descricao: "Leitura de avarias, testes aos sensores e relatório com fotografias, antes de qualquer orçamento.", imagem: { url: '/imagens/site/servico-diagnostico.jpg', alt: "Técnico a ligar o equipamento de diagnóstico", credito: "Nenad Stojkovic · CC BY 2.0 · Wikimedia Commons" } },
     { id: "revisao", titulo: "Revisões e manutenção", descricao: "Óleo, filtros, correias e líquidos nos intervalos certos para o seu motor.", imagem: { url: '/imagens/site/servico-revisao.jpg', alt: "Mudança de óleo do motor", credito: "Tim Mossholder timmossholder · CC0 · Wikimedia Commons" } },
     { id: "travoes", titulo: "Travões e suspensão", descricao: "Pastilhas, discos, amortecedores e alinhamento, com verificação de segurança no fim.", imagem: { url: '/imagens/site/servico-travoes.jpg', alt: "Disco e pinça de travão", credito: "Riley from Christchurch, New Zealand · CC BY 2.0 · Wikimedia Commons" } },
-    { id: "motor", titulo: "Motor e transmissão", descricao: "Injeção diesel, embraiagem, caixa e distribuição, com peças adequadas a cada modelo.", imagem: { url: '/imagens/site/servico-motor.jpg', alt: "Correias e polias de um motor", credito: "Chad Kirchoff · CC0 · Wikimedia Commons" } },
-    { id: "4x4", titulo: "Tração 4x4", descricao: "Super Select, caixa de transferência, diferenciais e bloqueios — testados em carga.", imagem: { url: '/imagens/site/servico-4x4.jpg', alt: "Mitsubishi Pajero na lama", credito: "Biso · CC BY 3.0 · Wikimedia Commons" } },
-    { id: "mecanica", titulo: "Mecânica geral", descricao: "Tudo o resto que a viatura precisa, com o mesmo cuidado e o mesmo orçamento prévio.", imagem: { url: '/imagens/site/servico-mecanica.jpg', alt: "Viatura em reparação na oficina", credito: "Shixart1985 · CC BY 2.0 · Wikimedia Commons" } },
+    { id: "motor", titulo: "Motor e transmissão", descricao: "Injeção a gasolina e diesel, embraiagem, caixa e distribuição, com peças adequadas a cada marca e modelo.", imagem: { url: '/imagens/site/servico-motor.jpg', alt: "Correias e polias de um motor", credito: "Chad Kirchoff · CC0 · Wikimedia Commons" } },
+    { id: "4x4", titulo: "Tração 4x4", descricao: "Caixas de transferência, diferenciais e bloqueios de jipes e pick-ups de todas as marcas — testados em carga.", imagem: { url: '/imagens/site/servico-4x4.jpg', alt: "Mitsubishi Pajero na lama", credito: "Biso · CC BY 3.0 · Wikimedia Commons" } },
+    { id: "mecanica", titulo: "Mecânica geral", descricao: "Ligeiros, jipes e pick-ups de qualquer marca: tudo o que a viatura precisa, com o mesmo cuidado e orçamento prévio.", imagem: { url: '/imagens/site/servico-mecanica.jpg', alt: "Viatura em reparação na oficina", credito: "Shixart1985 · CC BY 2.0 · Wikimedia Commons" } },
   ],
   galeria: [
-    { id: "oficina", ...{ url: '/imagens/site/galeria-oficina.jpg', alt: "Mecânico a trabalhar numa viatura na oficina", credito: "Igor Ovsyannykov igorovsyannykov · CC0 · Wikimedia Commons" } },
     { id: "dunas", ...{ url: '/imagens/site/galeria-dunas.jpg', alt: "Pajero nas dunas ao fim da tarde", credito: "Darvin.wilson · CC BY-SA 4.0 · Wikimedia Commons" } },
     { id: "triton", ...{ url: '/imagens/site/galeria-triton.jpg', alt: "Mitsubishi Triton preparada para rali", credito: "Tokumeigakarinoaoshima · CC0 · Wikimedia Commons" } },
     { id: "bancada", ...{ url: '/imagens/site/galeria-bancada.jpg', alt: "Bancada de ferramentas da oficina", credito: "AJ Yorio lightninghorse · CC0 · Wikimedia Commons" } },
@@ -204,9 +207,9 @@ export const CONTEUDO_SITE_PADRAO: ConteudoSite = {
     mapaUrl: '',
   },
   seo: {
-    titulo: 'MZD Carros e Motores — Especialistas em Mitsubishi em Luanda',
-    descricao: "Oficina especializada em Mitsubishi: diagnóstico eletrónico, revisões, travões, suspensão, motor e 4x4. Orçamento aprovado antes da reparação e acompanhamento online.",
+    titulo: 'MZD Carros e Motores — Oficina em Luanda · Especialistas Mitsubishi',
+    descricao: "Oficina multimarca em Luanda, especialista em Mitsubishi: diagnóstico eletrónico, revisões, travões, suspensão, motor e 4x4. Orçamento aceite antes da reparação.",
   },
 };
 
-export const AVISO_MARCA = 'A MZD Carros e Motores é uma oficina independente. Mitsubishi e os nomes dos modelos são marcas da Mitsubishi Motors Corporation.';
+export const AVISO_MARCA = 'A MZD Carros e Motores é uma oficina independente, sem ligação aos fabricantes. As marcas e os nomes dos modelos pertencem aos respetivos titulares.';

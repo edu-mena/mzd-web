@@ -17,7 +17,8 @@ import { auditar, exigir, novoId, obterProcesso, registarHistorico, texto, umDe,
 import type { Handler } from './contexto';
 import { diaLocal } from './financeiro';
 import { can } from '../../auth/permissions';
-import { saldoEmAberto } from '../../lib/calculos';
+import { faltaPagamentoAceitacao, faturasDe, saldoEmAberto } from '../../lib/calculos';
+import { formatAOA } from '../../lib/format';
 import { MODELOS_PADRAO, variaveisDesconhecidas } from '../../lib/mensagens';
 import { horaCurta } from '../../lib/datas';
 import { CANAL_LABEL, estaAtivo } from '../../types';
@@ -78,6 +79,10 @@ export function notificarMudanca(p: Processo, anterior: EstadoProcesso, autorId?
     case 'em_reparacao':
       if (anterior === 'controlo_qualidade') {
         return notificar({ utilizadores: [p.mecanicoId], perfis: ['chefe_oficina'] }, 'Controlo de qualidade reprovado', `${ref} voltou à reparação.`, link, autorId);
+      }
+      if (faltaPagamentoAceitacao(p) > 0) {
+        const onde = p.autorizacao?.metodo === 'portal' ? ' no portal' : '';
+        return notificar({ perfis: balcao }, `Orçamento aceite${onde} — falta o pagamento`, `${ref} — receber ${formatAOA(faltaPagamentoAceitacao(p))} para a reparação começar.`, link, autorId);
       }
       return notificar({ utilizadores: [p.mecanicoId], perfis: ['chefe_oficina'] }, 'Reparação aprovada pelo cliente', `${ref} — pode começar a reparação.`, link, autorId);
     case 'controlo_qualidade':
@@ -161,11 +166,16 @@ function pendentes(comValores: boolean): ComunicacaoPendente[] {
     const v = base.viaturas.find((x) => x.id === p.viaturaId);
     const contacto = { clienteId: c.id, processoId: p.id, nome: c.nome, telefone: c.telefone, email: c.email, consentimento: c.consentimentoMensagens, matricula: v?.matricula };
     const momento = MOMENTOS[p.estado];
-    if (momento) {
+    // Avisado por telefone ou ao balcão também conta.
+    if (momento && !(p.estado === 'pronta_entrega' && p.avisoLevantamento)) {
       const desde = entradaNaEtapa(p);
       if (!avisado(desde, (m) => m.processoId === p.id)) {
         lista.push({ id: `${momento.motivo}-${p.id}`, motivo: momento.motivo, modelo: momento.motivo, titulo: momento.titulo, desde, ...contacto });
       }
+    }
+    // Aceite, à espera do pagamento da aceitação: pedir o pagamento com as coordenadas.
+    if (p.estado === 'em_reparacao' && p.autorizacao && faltaPagamentoAceitacao(p) > 0 && !avisado(p.autorizacao.data, (m) => m.processoId === p.id && m.modelo === 'pagamento')) {
+      lista.push({ id: `pagamento-${p.id}`, motivo: 'pagamento', modelo: 'pagamento', titulo: 'Pedir o pagamento da aceitação', desde: p.autorizacao.data, ...contacto });
     }
     const adicional = p.orcamentosAdicionais?.find((a) => a.estado === 'enviado');
     if (adicional && !avisado(adicional.criadoEm, (m) => m.processoId === p.id)) {
@@ -200,13 +210,15 @@ function pendentes(comValores: boolean): ComunicacaoPendente[] {
   const semana = new Date(Date.now() - 7 * 86400000).toISOString();
   const porCliente = new Map<string, { total: number; faturas: string[]; desde: string }>();
   for (const p of base.processos) {
-    const saldo = saldoEmAberto(p.fatura);
-    if (!p.fatura || saldo <= 0 || Date.now() - new Date(p.fatura.data).getTime() < 30 * 86400000) continue;
-    const d = porCliente.get(p.clienteId) ?? { total: 0, faturas: [], desde: p.fatura.data };
-    d.total += saldo;
-    d.faturas.push(p.fatura.numero);
-    if (p.fatura.data < d.desde) d.desde = p.fatura.data;
-    porCliente.set(p.clienteId, d);
+    for (const f of faturasDe(p)) {
+      const saldo = saldoEmAberto(f);
+      if (saldo <= 0 || Date.now() - new Date(f.data).getTime() < 30 * 86400000) continue;
+      const d = porCliente.get(p.clienteId) ?? { total: 0, faturas: [], desde: f.data };
+      d.total += saldo;
+      d.faturas.push(f.numero);
+      if (f.data < d.desde) d.desde = f.data;
+      porCliente.set(p.clienteId, d);
+    }
   }
   for (const [clienteId, d] of porCliente) {
     if (avisado(semana, (m) => m.clienteId === clienteId && m.modelo === 'divida')) continue;
@@ -270,6 +282,10 @@ export const rotasComunicacoes: [Metodo, string, Handler][] = [
     const u = exigir('mensagens.enviar');
     const { mensagem, processo } = validarMensagem(body, u.id);
     db().mensagens.push(mensagem);
+    // A primeira mensagem ao cliente com a viatura pronta é o aviso: começa a contar o prazo para levantar.
+    if (processo?.estado === 'pronta_entrega' && mensagem.direcao === 'saida' && !processo.avisoLevantamento) {
+      processo.avisoLevantamento = { data: mensagem.data, canal: mensagem.canal, porId: u.id };
+    }
     if (processo) {
       const modelo = mensagem.modelo ? modelos().find((m) => m.chave === mensagem.modelo)?.nome : undefined;
       registarHistorico(

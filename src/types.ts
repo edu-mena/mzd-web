@@ -125,17 +125,30 @@ export interface ItemDano {
   nota?: string;
 }
 
+/**
+ * Ficha de entrada. A receção só regista a queixa e o prazo; o estado da viatura (quilómetros, combustível,
+ * danos, pertences) é verificado pelo mecânico com o cliente numa ficha em papel, que o cliente assina.
+ * A receção digitaliza a ficha preenchida e transcreve os dados que o sistema usa (km, combustível, pertences).
+ */
 export interface FichaRecepcao {
   queixaCliente: string;
-  km: number;
-  combustivel: number; // 0-100
-  bateria: 'boa' | 'fraca' | 'a_testar';
-  danos: ItemDano[];
-  pertences: string;
+  /** Vazio até a ficha em papel ser digitalizada. */
+  km?: number;
+  /** 0–100. */
+  combustivel?: number;
+  /** Só nos processos registados no ecrã, antes da ficha em papel. */
+  bateria?: 'boa' | 'fraca' | 'a_testar';
+  danos?: ItemDano[];
+  pertences?: string;
   dataHora: string;
+  /** A ficha foi assinada pelo cliente (em papel e digitalizada; ou no ecrã, nos processos antigos). */
   assinaturaCliente: boolean;
-  /** Imagem da assinatura do cliente na receção. */
+  /** Assinatura recolhida no ecrã (processos antigos). */
   assinaturaAnexoId?: string;
+  /** Páginas digitalizadas da ficha preenchida e assinada (anexos com finalidade "ficha_entrada"). */
+  digitalizacaoIds?: string[];
+  digitalizadaEm?: string;
+  digitalizadaPorId?: string;
   atendenteId: string;
 }
 
@@ -169,12 +182,29 @@ export interface ItemOrcamentoMaoObra {
   valorHora: number;
 }
 
+/** Condições comerciais apresentadas ao cliente (copiadas das definições quando o orçamento é guardado). */
+export interface CondicoesComerciais {
+  /** % do valor das peças a pagar na aceitação do orçamento (o resto no levantamento). */
+  pecasAceitacaoPct: number;
+  /** % da mão de obra a pagar na aceitação do orçamento (o resto no levantamento). */
+  maoObraAceitacaoPct: number;
+  /** Parqueamento cobrado por dia depois dos prazos (Kz, sem IVA). */
+  parqueamentoDia: number;
+  /** Dias úteis que o cliente tem para levantar a viatura depois de avisado de que está pronta. */
+  diasUteisLevantamento: number;
+}
+
 export interface Orcamento {
   pecas: ItemOrcamentoPeca[];
   maoObra: ItemOrcamentoMaoObra[];
-  /** Taxa de IVA em vigor no momento da emissão (%), guardada com o orçamento. */
+  /** Taxa de IVA em vigor no momento da emissão (%), guardada com o orçamento. 0 quando é sem IVA. */
   taxaIva: number;
+  /** Orçamento (e fatura) sem IVA: motivo legal impresso nos documentos. */
+  isencaoIva?: string;
+  /** Dias para o cliente aceitar; depois disso conta parqueamento. */
   validadeDias: number;
+  condicoes: CondicoesComerciais;
+  /** Texto das condições de pagamento, gerado a partir de `condicoes`. */
   condicoesPagamento: string;
   enviadoEm?: string;
   estado: 'rascunho' | 'enviado' | 'aprovado' | 'recusado';
@@ -196,7 +226,7 @@ export interface Autorizacao {
 export type MetodoAprovacao = 'presencial' | 'email' | 'whatsapp' | 'telefone' | 'portal';
 
 export const METODO_APROVACAO_LABEL: Record<MetodoAprovacao, string> = {
-  presencial: 'Presencial, com assinatura',
+  presencial: 'Na oficina, pró-forma assinada',
   whatsapp: 'Por WhatsApp',
   email: 'Por email',
   telefone: 'Por telefone',
@@ -209,7 +239,9 @@ export interface OrcamentoAdicional {
   justificacao: string;
   pecas: ItemOrcamentoPeca[];
   maoObra: ItemOrcamentoMaoObra[];
+  /** O mesmo regime de IVA do orçamento principal. */
   taxaIva: number;
+  isencaoIva?: string;
   criadoEm: string;
   criadoPorId: string;
   estado: 'enviado' | 'aprovado' | 'recusado';
@@ -346,6 +378,50 @@ export interface Fatura {
   pagamentos: Pagamento[];
 }
 
+/**
+ * Dias em que a viatura ocupou a oficina por demora do cliente:
+ * - orcamento: sem resposta depois da validade do orçamento;
+ * - levantamento: pronta e não levantada depois dos dias úteis dados no aviso.
+ */
+export interface PeriodoParqueamento {
+  motivo: 'orcamento' | 'levantamento';
+  /** Primeiro e último dia cobrados ("AAAA-MM-DD", inclusive). */
+  de: string;
+  ate: string;
+  dias: number;
+}
+
+export const MOTIVO_PARQUEAMENTO_LABEL: Record<PeriodoParqueamento['motivo'], string> = {
+  orcamento: 'Orçamento sem resposta depois da validade',
+  levantamento: 'Viatura pronta e não levantada no prazo',
+};
+
+/** Fatura própria do parqueamento (a fatura do serviço é emitida quando a viatura fica pronta). */
+export interface FaturaParqueamento extends Fatura {
+  periodos: PeriodoParqueamento[];
+  /** Kz por dia, sem IVA. */
+  valorDia: number;
+  taxaIva: number;
+  isencaoIva?: string;
+}
+
+/** Decisão da Direção que abre uma exceção às condições comerciais. */
+export interface Dispensa {
+  motivo: string;
+  data: string;
+  porId: string;
+}
+
+export type CanalAviso = 'whatsapp' | 'email' | 'telefone' | 'presencial';
+export const CANAL_AVISO_LABEL: Record<CanalAviso, string> = { whatsapp: 'WhatsApp', email: 'Email', telefone: 'Telefone', presencial: 'Presencialmente' };
+
+/** Aviso ao cliente de que a viatura está pronta: a partir daqui conta o prazo para levantar. */
+export interface AvisoLevantamento {
+  data: string;
+  canal: CanalAviso;
+  porId?: string;
+}
+
 export interface Garantia {
   item: string;
   tipo: 'peca' | 'mao_obra';
@@ -396,7 +472,13 @@ export interface Processo {
   notaPecas?: string;
   /** Pagamentos recebidos antes da emissão da fatura; passam para a fatura quando é emitida. */
   adiantamentos?: Pagamento[];
+  /** A Direção deixou a reparação começar sem o pagamento da aceitação. */
+  dispensaPagamentoAceitacao?: Dispensa;
   fatura?: Fatura;
+  avisoLevantamento?: AvisoLevantamento;
+  faturasParqueamento?: FaturaParqueamento[];
+  /** A Direção dispensou o parqueamento ainda não faturado (e deixa de contar). */
+  dispensaParqueamento?: Dispensa;
   garantias?: Garantia[];
   entrega?: Entrega;
   cancelamento?: Cancelamento;
@@ -519,7 +601,7 @@ export interface Anexo {
   autorId: string;
 }
 
-export type FinalidadeAnexo = 'assinatura_recepcao' | 'assinatura_aprovacao' | 'comprovativo_aprovacao' | 'assinatura_entrega';
+export type FinalidadeAnexo = 'ficha_entrada' | 'assinatura_recepcao' | 'assinatura_aprovacao' | 'comprovativo_aprovacao' | 'assinatura_entrega';
 
 export interface EventoAuditoria {
   id: string;
@@ -533,6 +615,16 @@ export interface EventoAuditoria {
 
 // ---------- Configuração ----------
 
+/** Conta para pagamentos por transferência (aparece nas pró-formas, nas faturas e no portal do cliente). */
+export interface CoordenadaPagamento {
+  id: string;
+  banco: string;
+  titular: string;
+  iban: string;
+  /** Nº de conta, quando o banco o pede além do IBAN. */
+  conta?: string;
+}
+
 export interface Configuracao {
   empresa: {
     nome: string;
@@ -540,12 +632,18 @@ export interface Configuracao {
     morada: string;
     telefone: string;
     email: string;
-    iban?: string;
   };
+  coordenadasPagamento: CoordenadaPagamento[];
+  /** Ex.: "Indique o nº do processo no descritivo e envie o comprovativo por WhatsApp." */
+  instrucoesPagamento?: string;
   /** Taxa de IVA (%) aplicada a novos orçamentos. */
   taxaIva: number;
+  /** Motivo legal impresso nos orçamentos e faturas sem IVA. */
+  motivoIsencaoIva: string;
   valorHora: number;
+  /** Dias para o cliente aceitar o orçamento; depois disso conta parqueamento. */
   validadeOrcamentoDias: number;
+  condicoes: CondicoesComerciais;
   garantiaPecasMeses: number;
   garantiaMaoObraMeses: number;
   /** Nº de viaturas que a oficina consegue receber por dia (marcações). */
@@ -598,6 +696,11 @@ export interface ProcessoDetalhado extends Processo {
   cliente: Cliente;
   viatura: Viatura;
   mecanico?: Utilizador;
+  /**
+   * Calculado pelo servidor, para todos (também para quem não vê valores): o cliente aceitou,
+   * mas a reparação ainda não pode começar porque falta o pagamento da aceitação.
+   */
+  aguardaPagamento?: boolean;
 }
 
 export interface ClienteResumo extends Cliente {
@@ -631,7 +734,7 @@ export const ESTADO_MENSAGEM_LABEL: Record<EstadoMensagem, string> = {
 };
 
 export type ChaveModelo =
-  | 'rececao' | 'diagnostico' | 'orcamento' | 'adicional' | 'reparacao' | 'pronta' | 'entregue'
+  | 'rececao' | 'diagnostico' | 'orcamento' | 'pagamento' | 'adicional' | 'reparacao' | 'pronta' | 'entregue'
   | 'marcacao' | 'divida' | 'livre';
 
 export interface ModeloMensagem {
@@ -669,7 +772,7 @@ export interface Mensagem {
 /** Cliente por avisar: um momento-chave sem mensagem enviada desde então. */
 export interface ComunicacaoPendente {
   id: string;
-  motivo: 'rececao' | 'orcamento' | 'adicional' | 'pronta' | 'marcacao' | 'divida';
+  motivo: 'rececao' | 'orcamento' | 'pagamento' | 'adicional' | 'pronta' | 'marcacao' | 'divida';
   modelo: ChaveModelo;
   titulo: string;
   desde: string;
@@ -710,7 +813,7 @@ export const ESTADO_CLIENTE: Record<EstadoProcesso, string> = {
   recepcao: 'Recebida',
   diagnostico: 'Em diagnóstico',
   orcamentacao: 'Orçamento em preparação',
-  aguarda_aprovacao: 'À espera da sua aprovação',
+  aguarda_aprovacao: 'À espera da sua aceitação',
   em_reparacao: 'Em reparação',
   controlo_qualidade: 'Verificação final',
   pronta_entrega: 'Pronta a levantar',
@@ -722,6 +825,7 @@ interface LinhasPortal {
   pecas: { descricao: string; quantidade: number; precoUnitario: number }[];
   maoObra: { descricao: string; horas: number; valorHora: number }[];
   taxaIva: number;
+  isencaoIva?: string;
 }
 
 /**
@@ -736,7 +840,7 @@ export interface PortalProcesso {
   aguardaPecas: boolean;
   cliente: { nome: string };
   viatura: { matricula: string; marca: string; modelo: string };
-  oficina: { nome: string; telefone: string; email: string; morada: string; iban?: string };
+  oficina: { nome: string; telefone: string; email: string; morada: string; coordenadas: CoordenadaPagamento[]; instrucoesPagamento?: string };
   queixa: string;
   /** Data de entrada em cada etapa já percorrida. */
   etapas: { estado: EstadoProcesso; data: string }[];
@@ -749,11 +853,21 @@ export interface PortalProcesso {
     expirado: boolean;
     estado: Orcamento['estado'];
     descontoPct?: number;
+    condicoes: CondicoesComerciais;
+    /** A pagar na aceitação e no levantamento (com IVA). */
+    pagamentoAceitacao: number;
+    pagamentoLevantamento: number;
   };
   autorizacao?: { data: string; metodo: MetodoAprovacao; autorizadoPor: string };
   adicionais: (LinhasPortal & { id: string; justificacao: string; criadoEm: string; estado: OrcamentoAdicional['estado'] })[];
   progresso?: { feitas: number; total: number };
   valores?: { total: number; pago: number; aPagar: number; fatura?: string };
+  /** Aceite, à espera do pagamento da aceitação para começar a reparação (valor em falta). */
+  aguardaPagamentoAceitacao?: number;
+  /** Viatura pronta e cliente avisado: último dia para levantar sem parqueamento ("AAAA-MM-DD"). */
+  levantarAte?: string;
+  /** Parqueamento a contar ou por pagar (valor com IVA). */
+  parqueamento?: { valorDia: number; dias: number; valor: number; desde: string };
   entregueEm?: string;
   canceladoEm?: string;
   fotos: Anexo[];
@@ -777,6 +891,8 @@ export interface Relatorio {
     pecas: number;
     maoObra: number;
     descontos: number;
+    /** Faturas de parqueamento emitidas no período (com IVA). */
+    parqueamento: number;
     /** Só para quem gere o stock (custos). Custo ao preço médio atual. */
     margemPecas?: { venda: number; custo: number };
     /** 12 meses até ao fim do período ("AAAA-MM"). */
@@ -868,6 +984,9 @@ export interface ConteudoSite {
   hero: { titulo: string; subtitulo: string; imagem: ImagemSite };
   /** Destaques curtos por baixo da imagem principal (ex.: "Aprovação online"). */
   destaques: { titulo: string; texto: string }[];
+  /** Marcas que a oficina repara (só o nome; sem logótipos de terceiros). */
+  marcas: string[];
+  /** Modelos da especialidade (Mitsubishi). */
   modelos: { id: string; nome: string; descricao: string; imagem: ImagemSite }[];
   servicos: { id: string; titulo: string; descricao: string; imagem: ImagemSite }[];
   galeria: (ImagemSite & { id: string })[];

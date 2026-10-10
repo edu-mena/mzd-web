@@ -13,7 +13,7 @@ import { auditar, exigir, exigirEstado, novoId, numero, obterProcesso, registarH
 import type { Handler } from './contexto';
 import { notificar } from './comunicacoes';
 import { can } from '../../auth/permissions';
-import { saldoEmAberto } from '../../lib/calculos';
+import { faturasDe, saldoEmAberto } from '../../lib/calculos';
 import type { Desconto, DividaCliente, FechoCaixa, FormaPagamento, MovimentoContaCorrente, Pagamento, Processo } from '../../types';
 
 export function diaLocal(iso: string | Date): string {
@@ -57,8 +57,11 @@ export function avaliarDesconto(body: any, atual: Desconto | undefined, u: Utili
   };
 }
 
+/** Pagamentos de um processo: das faturas (serviço e parqueamento) e adiantamentos. */
+const pagamentosDe = (p: Processo) => [...faturasDe(p).flatMap((f) => f.pagamentos), ...(p.adiantamentos ?? [])];
+
 function todosPagamentos(): { pg: Pagamento; p: Processo }[] {
-  return db().processos.flatMap((p) => [...(p.fatura?.pagamentos ?? []), ...(p.adiantamentos ?? [])].map((pg) => ({ pg, p })));
+  return db().processos.flatMap((p) => pagamentosDe(p).map((pg) => ({ pg, p })));
 }
 
 export const rotasFinanceiro: [Metodo, string, Handler][] = [
@@ -87,7 +90,7 @@ export const rotasFinanceiro: [Metodo, string, Handler][] = [
     const u = exigir('pagamentos.registar');
     const p = obterProcesso(params.id);
     if (p.estado === 'entregue') throw new ApiError(422, 'A viatura já foi entregue — não é possível anular pagamentos deste processo.');
-    const pg = [...(p.fatura?.pagamentos ?? []), ...(p.adiantamentos ?? [])].find((x) => x.id === params.pid);
+    const pg = pagamentosDe(p).find((x) => x.id === params.pid);
     if (!pg) throw new ApiError(404, 'Pagamento não encontrado.');
     if (pg.anulado) throw new ApiError(422, 'Este pagamento já está anulado.');
     const dia = diaLocal(pg.data);
@@ -127,7 +130,7 @@ export const rotasFinanceiro: [Metodo, string, Handler][] = [
             clienteNif: c?.nif,
             matricula: base.viaturas.find((v) => v.id === p.viaturaId)?.matricula,
             // Pagamento de fatura (ou adiantamento, se ainda não havia fatura).
-            faturaNumero: p.fatura?.pagamentos.some((x) => x.id === pg.id) ? p.fatura.numero : undefined,
+            faturaNumero: faturasDe(p).find((f) => f.pagamentos.some((x) => x.id === pg.id))?.numero,
           };
         }),
     };
@@ -175,10 +178,10 @@ export const rotasFinanceiro: [Metodo, string, Handler][] = [
     const base = db();
     const agora = Date.now();
     const porCliente = new Map<string, DividaCliente>();
-    base.processos.filter((p) => p.fatura && saldoEmAberto(p.fatura) > 0).forEach((p) => {
+    base.processos.flatMap((p) => faturasDe(p).filter((f) => saldoEmAberto(f) > 0).map((f) => ({ p, f }))).forEach(({ p, f }) => {
       const c = base.clientes.find((x) => x.id === p.clienteId)!;
-      const saldo = saldoEmAberto(p.fatura);
-      const dias = Math.floor((agora - new Date(p.fatura!.data).getTime()) / 86400000);
+      const saldo = saldoEmAberto(f);
+      const dias = Math.floor((agora - new Date(f.data).getTime()) / 86400000);
       const d = porCliente.get(c.id) ?? {
         cliente: { id: c.id, nome: c.nome, telefone: c.telefone, consentimentoMensagens: c.consentimentoMensagens },
         total: 0,
@@ -187,7 +190,7 @@ export const rotasFinanceiro: [Metodo, string, Handler][] = [
       };
       d.total += saldo;
       d.escaloes[dias <= 30 ? 0 : dias <= 60 ? 1 : dias <= 90 ? 2 : 3] += saldo;
-      d.faturas.push({ processoId: p.id, processoNumero: p.numero, numero: p.fatura!.numero, data: p.fatura!.data, dias, saldo });
+      d.faturas.push({ processoId: p.id, processoNumero: p.numero, numero: f.numero, data: f.data, dias, saldo });
       porCliente.set(c.id, d);
     });
     return [...porCliente.values()].sort((a, b) => b.total - a.total);
@@ -198,8 +201,8 @@ export const rotasFinanceiro: [Metodo, string, Handler][] = [
     exigir('valores.ver');
     const movs: Omit<MovimentoContaCorrente, 'saldo'>[] = [];
     db().processos.filter((p) => p.clienteId === params.id).forEach((p) => {
-      if (p.fatura) movs.push({ data: p.fatura.data, tipo: 'fatura', documento: p.fatura.numero, processoId: p.id, processoNumero: p.numero, debito: p.fatura.valorTotal, credito: 0 });
-      [...(p.fatura?.pagamentos ?? []), ...(p.adiantamentos ?? [])].forEach((pg) => {
+      faturasDe(p).forEach((f) => movs.push({ data: f.data, tipo: 'fatura', documento: f.numero, processoId: p.id, processoNumero: p.numero, debito: f.valorTotal, credito: 0 }));
+      pagamentosDe(p).forEach((pg) => {
         movs.push({ data: pg.data, tipo: 'pagamento', documento: pg.numeroRecibo, processoId: p.id, processoNumero: p.numero, debito: 0, credito: pg.valor });
         if (pg.anulado) movs.push({ data: pg.anulado.data, tipo: 'anulacao', documento: `Anulação ${pg.numeroRecibo}`, processoId: p.id, processoNumero: p.numero, debito: pg.valor, credito: 0 });
       });

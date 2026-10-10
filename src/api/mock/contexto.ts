@@ -4,6 +4,7 @@ import { ApiError } from '../client';
 import { db, sessaoAtual } from './db';
 import type { MockDB, UtilizadorComSenha } from './seed';
 import { can } from '../../auth/permissions';
+import { faltaPagamentoAceitacao } from '../../lib/calculos';
 import type { Permissao } from '../../auth/permissions';
 import type { AcessoPortal, EstadoProcesso, HistoricoEvento, Processo, ProcessoDetalhado, Utilizador } from '../../types';
 
@@ -93,6 +94,7 @@ function ocultarValores(p: ProcessoDetalhado): ProcessoDetalhado {
     autorizacao: p.autorizacao && { ...p.autorizacao, valorTotal: 0 },
     adiantamentos: undefined,
     fatura: undefined,
+    faturasParqueamento: undefined,
   };
 }
 
@@ -104,6 +106,7 @@ export function detalhar(p: Processo, u: UtilizadorComSenha): ProcessoDetalhado 
     cliente: base.clientes.find((c) => c.id === p.clienteId)!,
     viatura: base.viaturas.find((v) => v.id === p.viaturaId)!,
     mecanico: mec ? publico(mec) : undefined,
+    aguardaPagamento: p.estado === 'em_reparacao' && faltaPagamentoAceitacao(p) > 0,
   };
   // O link do portal é uma credencial do cliente: só o vê quem lhe envia mensagens.
   if (!can(u, 'mensagens.enviar')) det.portal = undefined;

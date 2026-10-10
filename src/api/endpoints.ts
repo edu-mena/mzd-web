@@ -103,7 +103,8 @@ export interface NovoProcesso {
   novoCliente?: Pick<Cliente, 'nome' | 'telefone' | 'email' | 'nif' | 'morada' | 'consentimentoMensagens'>;
   viaturaId?: string;
   novaViatura?: Pick<Viatura, 'matricula' | 'marca' | 'modelo' | 'ano' | 'cor' | 'chassi'>;
-  ficha: Pick<FichaRecepcao, 'queixaCliente' | 'km' | 'combustivel' | 'bateria' | 'danos' | 'pertences'>;
+  /** Só a queixa: o estado de entrada vem da ficha em papel (ver `registarFichaEntrada`). */
+  ficha: Pick<FichaRecepcao, 'queixaCliente'>;
   prazoEntrega: string;
   urgente: boolean;
   /** Marcação que deu origem a esta receção (passa a "chegou"). */
@@ -127,13 +128,23 @@ export interface DadosDiagnostico extends Pick<Diagnostico, 'parecerGeral' | 're
   concluir: boolean;
 }
 
+/** A validade e as condições comerciais vêm das definições (o servidor copia-as para o orçamento). */
 export interface DadosOrcamento {
   pecas: ItemOrcamentoPeca[];
   maoObra: ItemOrcamentoMaoObra[];
-  validadeDias: number;
-  condicoesPagamento: string;
   /** Sem desconto: omitir ou percentagem 0. */
   desconto?: { percentagem: number; motivo: string };
+  /** Orçamento e fatura sem IVA; o motivo, se vazio, é o das definições. */
+  semIva?: boolean;
+  motivoIsencaoIva?: string;
+}
+
+/** Ficha de entrada em papel, digitalizada: páginas já enviadas como anexos "ficha_entrada" e dados transcritos. */
+export interface DadosFichaEntrada {
+  digitalizacaoIds: string[];
+  km: number;
+  combustivel?: number;
+  pertences?: string;
 }
 
 export interface PagamentoCaixa extends Pagamento {
@@ -156,6 +167,8 @@ export interface DadosPagamento {
   valor: number;
   forma: FormaPagamento;
   referencia?: string;
+  /** Nº da fatura a pagar (por omissão, a do serviço). */
+  fatura?: string;
 }
 
 export type DadosAprovacao =
@@ -164,8 +177,9 @@ export type DadosAprovacao =
       decisao: 'aprovado';
       metodo: MetodoAprovacao;
       autorizadoPor: string;
-      assinaturaAnexoId?: string;
+      /** Pró-forma assinada (na oficina) ou captura da resposta (WhatsApp/email). Não se usa por telefone. */
       comprovativoAnexoId?: string;
+      /** Pagamento da aceitação recebido no momento. */
       adiantamento?: DadosPagamento;
     };
 
@@ -212,6 +226,7 @@ export const api = {
       request<ProcessoDetalhado[]>('GET', `/processos${qs(filtros)}`),
     obter: (id: string) => request<ProcessoDetalhado>('GET', `/processos/${id}`),
     criar: (dados: NovoProcesso) => request<ProcessoDetalhado>('POST', '/processos', dados),
+    registarFichaEntrada: (id: string, dados: DadosFichaEntrada) => request<ProcessoDetalhado>('PUT', `/processos/${id}/ficha-entrada`, dados),
     avancar: (id: string) => request<ProcessoDetalhado>('POST', `/processos/${id}/avancar`),
     cancelar: (id: string, motivo: string) => request<ProcessoDetalhado>('POST', `/processos/${id}/cancelar`, { motivo }),
     atribuirMecanico: (id: string, mecanicoId: string) => request<ProcessoDetalhado>('PATCH', `/processos/${id}/mecanico`, { mecanicoId }),
@@ -232,6 +247,13 @@ export const api = {
       request<ProcessoDetalhado>('PUT', `/processos/${id}/qualidade`, dados),
     registarPagamento: (id: string, dados: DadosPagamento) => request<ProcessoDetalhado>('POST', `/processos/${id}/pagamentos`, dados),
     registarEntrega: (id: string, dados: DadosEntrega) => request<ProcessoDetalhado>('POST', `/processos/${id}/entrega`, dados),
+    /** Aviso dado fora do sistema; por WhatsApp/email regista-se ao enviar a mensagem. */
+    avisarLevantamento: (id: string, canal: 'telefone' | 'presencial') => request<ProcessoDetalhado>('POST', `/processos/${id}/aviso-levantamento`, { canal }),
+    faturarParqueamento: (id: string) => request<ProcessoDetalhado>('POST', `/processos/${id}/parqueamento/faturar`),
+    /** Direção. */
+    dispensarParqueamento: (id: string, motivo: string) => request<ProcessoDetalhado>('POST', `/processos/${id}/parqueamento/dispensar`, { motivo }),
+    /** Direção: a reparação começa sem o pagamento da aceitação. */
+    dispensarPagamentoAceitacao: (id: string, motivo: string) => request<ProcessoDetalhado>('POST', `/processos/${id}/pagamento-aceitacao/dispensar`, { motivo }),
   },
   financeiro: {
     decidirDesconto: (processoId: string, decisao: 'aprovado' | 'recusado', motivo?: string) =>

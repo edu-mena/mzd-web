@@ -34,6 +34,7 @@ const Administracao = lazy(() => import('./pages/Administracao'));
 const AlterarSenha = lazy(() => import('./pages/AlterarSenha'));
 const Site = lazy(() => import('./pages/Site'));
 const GestaoSite = lazy(() => import('./pages/GestaoSite'));
+const ImprimirDocumento = lazy(() => import('./pages/ImprimirDocumento'));
 
 const protegida = (permissao: Permissao, pagina: ReactNode) => (
   <RequirePermission permissao={permissao}>{pagina}</RequirePermission>
@@ -54,6 +55,8 @@ export default function App() {
             <Route path="/p/:token" element={<PortalCliente />} />
             <Route element={<RequireAuth />}>
               <Route path="/alterar-senha" element={<AlterarSenha />} />
+              {/* Documentos para imprimir, fora do layout (abrem numa aba própria). */}
+              <Route path="/processos/:id/imprimir/:documento" element={protegida('processos.ver', <ImprimirDocumento />)} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={protegida('painel.ver', <Dashboard />)} />
                 <Route path="/processos" element={protegida('processos.ver', <Processos />)} />

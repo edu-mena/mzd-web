@@ -1,7 +1,8 @@
-import type { ChaveModelo, Configuracao, EstadoProcesso, Marcacao, ModeloMensagem, ProcessoDetalhado } from '../types';
-import { calcularTotais, emDivida } from './calculos';
+import type { ChaveModelo, Configuracao, CoordenadaPagamento, EstadoProcesso, Marcacao, ModeloMensagem, ProcessoDetalhado } from '../types';
+import { calcularTotais, emDivida, faltaPagamentoAceitacao, textoCondicoes, valorAceitacao } from './calculos';
 import { formatAOA, formatDate } from './format';
-import { horaCurta } from './datas';
+import { diaISO, horaCurta, somarDiasUteis } from './datas';
+import { aceitarAte, levantarAte } from './parqueamento';
 
 // Modelos de mensagem com variáveis entre chavetas, ex.: "Olá {cliente}, a viatura {matricula} está pronta."
 // Uma linha cuja variável não tem valor (ex.: {total} para quem não vê preços) é omitida por inteiro,
@@ -16,7 +17,13 @@ export const VARIAVEIS_MODELO: { chave: string; descricao: string; exemplo: stri
   { chave: 'prazo', descricao: 'Previsão de entrega', exemplo: '08/10/2026' },
   { chave: 'problemas', descricao: 'Problemas encontrados no diagnóstico (um por linha)', exemplo: '• Travões: pastilhas gastas' },
   { chave: 'total', descricao: 'Total do orçamento com IVA', exemplo: '185 000 Kz' },
-  { chave: 'validade', descricao: 'Validade do orçamento (dias)', exemplo: '15' },
+  { chave: 'validade', descricao: 'Validade do orçamento (dias)', exemplo: '10' },
+  { chave: 'aceitar_ate', descricao: 'Último dia para aceitar o orçamento sem parqueamento', exemplo: 'segunda-feira, 20 de outubro' },
+  { chave: 'condicoes', descricao: 'Condições de pagamento do orçamento', exemplo: 'Na aceitação do orçamento: 100% das peças e 60% da mão de obra. No levantamento da viatura: 40% da mão de obra.' },
+  { chave: 'pagamento_aceitacao', descricao: 'Valor a pagar na aceitação do orçamento', exemplo: '142 500 Kz' },
+  { chave: 'pagamento_falta', descricao: 'Valor que ainda falta do pagamento da aceitação', exemplo: '142 500 Kz' },
+  { chave: 'parqueamento_dia', descricao: 'Parqueamento por dia depois dos prazos', exemplo: '2 000 Kz + IVA' },
+  { chave: 'levantar_ate', descricao: 'Último dia para levantar a viatura sem parqueamento', exemplo: 'sexta-feira, 17 de outubro' },
   { chave: 'adicional_motivo', descricao: 'Justificação do trabalho adicional', exemplo: 'Disco de travão empenado' },
   { chave: 'adicional_total', descricao: 'Valor do trabalho adicional com IVA', exemplo: '42 000 Kz' },
   { chave: 'saldo', descricao: 'Valor ainda por pagar', exemplo: '60 000 Kz' },
@@ -26,7 +33,8 @@ export const VARIAVEIS_MODELO: { chave: string; descricao: string; exemplo: stri
   { chave: 'hora_marcacao', descricao: 'Hora da marcação', exemplo: '09:30' },
   { chave: 'oficina', descricao: 'Nome da oficina', exemplo: 'MZD Carros e Motores' },
   { chave: 'telefone_oficina', descricao: 'Telefone da oficina', exemplo: '+244 923 000 000' },
-  { chave: 'iban', descricao: 'IBAN para transferências', exemplo: 'AO06 0040 0000 …' },
+  { chave: 'coordenadas', descricao: 'Contas para transferência (uma por linha)', exemplo: 'BAI — IBAN AO06 0040 0000 1234 5678 1019 6' },
+  { chave: 'iban', descricao: 'IBAN da primeira conta', exemplo: 'AO06 0040 0000 …' },
   { chave: 'link', descricao: 'Link pessoal para o cliente acompanhar a viatura e aprovar orçamentos', exemplo: 'https://mzd.it.ao/p/Xk3…' },
 ];
 
@@ -34,6 +42,13 @@ export const VARIAVEIS_MODELO: { chave: string; descricao: string; exemplo: stri
 const origem = () => (typeof window !== 'undefined' ? window.location.origin : 'https://mzd.it.ao');
 
 export const linkPortal = (token: string) => `${origem()}/p/${token}`;
+
+/** Contas para transferência, uma por linha (mensagens e textos simples). */
+export const textoCoordenadas = (contas: CoordenadaPagamento[] = []) =>
+  contas.map((c) => `${c.banco} — IBAN ${c.iban}${c.conta ? ` · Conta ${c.conta}` : ''} · ${c.titular}`).join('\n') || undefined;
+
+/** "AAAA-MM-DD" → "segunda-feira, 20 de outubro". */
+export const diaPorExtenso = (dia: string) => new Date(`${dia}T12:00:00`).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const CHAVES = new Set(VARIAVEIS_MODELO.map((v) => v.chave));
 const PADRAO_VARIAVEL = /\{([a-z_]+)\}/g;
@@ -70,6 +85,12 @@ export function valoresDoContexto({ nome, config, processo: p, marcacao: m, divi
   const dinheiro = (v: number | undefined) => (comValores && v ? formatAOA(v) : undefined);
   const adicional = p?.orcamentosAdicionais?.find((a) => a.estado === 'enviado');
   const problemas = (p?.diagnostico?.itens ?? []).filter((i) => i.estado !== 'ok').map((i) => `• ${i.sistema}${i.observacao ? `: ${i.observacao}` : ''}`);
+  const o = p?.orcamento;
+  const ate = o ? aceitarAte(o) : undefined;
+  // A mensagem "pronta" é o próprio aviso: sem aviso registado, o prazo conta a partir de hoje.
+  const levantar = p && o && p.estado === 'pronta_entrega'
+    ? levantarAte(p) ?? somarDiasUteis(diaISO(new Date()), o.condicoes.diasUteisLevantamento)
+    : undefined;
   return {
     cliente: nome.trim().split(/\s+/)[0],
     cliente_nome: nome.trim(),
@@ -79,7 +100,13 @@ export function valoresDoContexto({ nome, config, processo: p, marcacao: m, divi
     prazo: p ? formatDate(p.prazoEntrega) : undefined,
     problemas: problemas.length ? problemas.join('\n') : undefined,
     total: dinheiro(p?.orcamento && calcularTotais(p.orcamento).total),
-    validade: p?.orcamento ? String(p.orcamento.validadeDias) : undefined,
+    validade: o ? String(o.validadeDias) : undefined,
+    aceitar_ate: ate && diaPorExtenso(ate),
+    condicoes: o?.condicoes && textoCondicoes(o.condicoes),
+    pagamento_aceitacao: dinheiro(valorAceitacao(o)),
+    pagamento_falta: dinheiro(p && faltaPagamentoAceitacao(p)),
+    parqueamento_dia: o?.condicoes.parqueamentoDia ? `${formatAOA(o.condicoes.parqueamentoDia)}${o.taxaIva > 0 ? ' + IVA' : ''}` : undefined,
+    levantar_ate: levantar && diaPorExtenso(levantar),
     adicional_motivo: adicional?.justificacao,
     adicional_total: dinheiro(adicional && calcularTotais(adicional).total),
     saldo: dinheiro(p && emDivida(p)),
@@ -89,14 +116,18 @@ export function valoresDoContexto({ nome, config, processo: p, marcacao: m, divi
     hora_marcacao: m ? horaCurta(m.data) : undefined,
     oficina: config?.empresa.nome ?? 'MZD Carros e Motores',
     telefone_oficina: config?.empresa.telefone,
-    iban: config?.empresa.iban,
+    coordenadas: textoCoordenadas(config?.coordenadasPagamento),
+    iban: config?.coordenadasPagamento[0]?.iban,
     link: p?.portal ? linkPortal(p.portal.token) : undefined,
   };
 }
 
 /** Modelo sugerido para avisar o cliente em cada etapa do processo. */
-export function modeloDaEtapa(p: Pick<ProcessoDetalhado, 'estado' | 'orcamentosAdicionais'>): ChaveModelo {
+export function modeloDaEtapa(
+  p: Pick<ProcessoDetalhado, 'estado' | 'orcamentosAdicionais' | 'orcamento' | 'autorizacao' | 'adiantamentos' | 'fatura' | 'dispensaPagamentoAceitacao'>,
+): ChaveModelo {
   if (p.orcamentosAdicionais?.some((a) => a.estado === 'enviado')) return 'adicional';
+  if (p.estado === 'em_reparacao' && faltaPagamentoAceitacao(p) > 0) return 'pagamento';
   const mapa: Partial<Record<EstadoProcesso, ChaveModelo>> = {
     recepcao: 'rececao',
     diagnostico: 'diagnostico',
@@ -129,12 +160,17 @@ export const MODELOS_PADRAO: ModeloMensagem[] = [
   {
     chave: 'orcamento', nome: 'Diagnóstico e orçamento', descricao: 'Com o orçamento pronto, para o cliente aprovar.',
     assunto: '{oficina} · Processo {processo} — diagnóstico e orçamento',
-    texto: 'Olá {cliente}, o diagnóstico da sua viatura {viatura} ({matricula}) está concluído.\n\nEncontrámos:\n{problemas}\n\nValor total: {total} (IVA incluído).\nOrçamento válido {validade} dias.\n\nVeja o detalhe e aprove aqui: {link}\nTambém pode responder SIM a esta mensagem.',
+    texto: 'Olá {cliente}, o diagnóstico da sua viatura {viatura} ({matricula}) está concluído.\n\nEncontrámos:\n{problemas}\n\nValor total: {total} (IVA incluído).\n{condicoes}\nA pagar na aceitação: {pagamento_aceitacao}.\n\nPode aceitar até {aceitar_ate}. Depois dessa data, a viatura fica em parqueamento ({parqueamento_dia} por dia).\n\nVeja o orçamento e aceite aqui: {link}\nTambém pode responder ACEITO a esta mensagem ou assinar a pró-forma na oficina.',
   },
   {
     chave: 'adicional', nome: 'Trabalho adicional', descricao: 'Quando aparece trabalho extra durante a reparação.',
     assunto: '{oficina} · Processo {processo} — trabalho adicional',
     texto: 'Olá {cliente}, durante a reparação da sua viatura {matricula} encontrámos trabalho adicional necessário:\n{adicional_motivo}\n\nValor adicional: {adicional_total} (IVA incluído).\n\nVeja o detalhe e decida aqui: {link}\nTambém pode responder SIM a esta mensagem.',
+  },
+  {
+    chave: 'pagamento', nome: 'Pagamento da aceitação', descricao: 'Orçamento aceite: falta o pagamento para a reparação começar.',
+    assunto: '{oficina} · Processo {processo} — pagamento para iniciar a reparação',
+    texto: 'Olá {cliente}, obrigado por aceitar o orçamento da viatura {matricula}.\nPara começarmos a reparação falta o pagamento de {pagamento_falta}.\n\nPode pagar na oficina (TPA, Multicaixa Express ou numerário) ou por transferência:\n{coordenadas}\n\nIndique o processo {processo} no descritivo e envie-nos o comprovativo.',
   },
   {
     chave: 'reparacao', nome: 'Em reparação', descricao: 'Ponto de situação durante a reparação.',
@@ -144,7 +180,7 @@ export const MODELOS_PADRAO: ModeloMensagem[] = [
   {
     chave: 'pronta', nome: 'Pronta para levantamento', descricao: 'Depois do controlo de qualidade aprovado.',
     assunto: '{oficina} · Processo {processo} — viatura pronta',
-    texto: 'Olá {cliente}, a sua viatura {viatura} ({matricula}) está pronta para levantamento.\nValor a pagar: {saldo}.\nDetalhes do serviço: {link}\n\nPode levantá-la de segunda a sexta, das 07h30 às 18h, e ao sábado até às 13h.',
+    texto: 'Olá {cliente}, a sua viatura {viatura} ({matricula}) está pronta para levantamento.\nValor a pagar: {saldo}.\nDetalhes do serviço: {link}\n\nPode levantá-la até {levantar_ate}, de segunda a sexta das 07h30 às 18h e ao sábado até às 13h. Depois dessa data aplica-se parqueamento ({parqueamento_dia} por dia).',
   },
   {
     chave: 'entregue', nome: 'Agradecimento', descricao: 'Depois da entrega, para saber como correu.',
@@ -159,7 +195,7 @@ export const MODELOS_PADRAO: ModeloMensagem[] = [
   {
     chave: 'divida', nome: 'Lembrete de pagamento', descricao: 'Faturas por pagar há mais de 30 dias.',
     assunto: '{oficina} · Faturas em aberto',
-    texto: 'Olá {cliente}, lembramos que tem {divida_total} por liquidar na {oficina} ({faturas}).\nPode pagar por TPA, Multicaixa Express ou transferência bancária.\nIBAN: {iban}\n\nObrigado.',
+    texto: 'Olá {cliente}, lembramos que tem {divida_total} por liquidar na {oficina} ({faturas}).\nPode pagar por TPA, Multicaixa Express ou transferência bancária:\n{coordenadas}\n\nObrigado.',
   },
   {
     chave: 'livre', nome: 'Mensagem livre', descricao: 'Ponto de partida para qualquer outro assunto.',

@@ -177,6 +177,9 @@ function CartaoProcesso({ p }: { p: ProcessoDetalhado }) {
       {p.aguardaPecas && (
         <p className="mt-2 inline-block rounded bg-sinal-ambar-fundo px-1.5 py-0.5 text-[11px] font-semibold text-sinal-ambar">Aguarda peças</p>
       )}
+      {p.aguardaPagamento && (
+        <p className="mt-2 inline-block rounded bg-sinal-ambar-fundo px-1.5 py-0.5 text-[11px] font-semibold text-sinal-ambar">Aguarda pagamento</p>
+      )}
       <div className="mt-2.5 flex items-center justify-between border-t border-linha/70 pt-2 text-[11.5px]">
         <span className="num text-mzd-gray">{p.numero}</span>
         <span className={clsx('num', late ? 'font-semibold text-sinal-vermelho' : 'text-mzd-gray')}>

@@ -16,7 +16,7 @@ import Kz from '../components/ui/Kz';
 import { Table, Th, Tr, Td } from '../components/ui/Table';
 import { Carregando, ErroCarregamento, Vazio } from '../components/ui/Estados';
 import { diasEntre, formatAOA, formatDate } from '../lib/format';
-import { calcularTotais, saldoEmAberto } from '../lib/calculos';
+import { calcularTotais, faturasDe, saldoEmAberto } from '../lib/calculos';
 import { TOM_ESTADO } from '../lib/estados';
 import { COR, eixo, milhares, tooltip } from '../lib/graficos';
 import PainelMecanico from './painel/PainelMecanico';
@@ -54,10 +54,11 @@ function PainelGestao() {
     const entregues = processos.filter((p) => p.estado === 'entregue');
     const faturados = processos.filter((p) => p.fatura);
 
-    const receitaTotal = faturados.reduce((s, p) => s + p.fatura!.valorTotal, 0);
+    // Faturação do serviço; o parqueamento (faturas à parte) também conta como receita.
+    const receitaTotal = faturados.reduce((s, p) => s + faturasDe(p).reduce((t, f) => t + f.valorTotal, 0), 0);
     const ticketMedio = faturados.length ? receitaTotal / faturados.length : 0;
-    const pendente = faturados.reduce((s, p) => s + saldoEmAberto(p.fatura), 0);
-    const comSaldo = faturados.filter((p) => saldoEmAberto(p.fatura) > 0).length;
+    const pendente = faturados.reduce((s, p) => s + faturasDe(p).reduce((t, f) => t + saldoEmAberto(f), 0), 0);
+    const comSaldo = faturados.flatMap(faturasDe).filter((f) => saldoEmAberto(f) > 0).length;
 
     const decididos = processos.filter((p) => p.orcamento && ['aprovado', 'recusado'].includes(p.orcamento.estado));
     const aprovados = decididos.filter((p) => p.orcamento!.estado === 'aprovado');

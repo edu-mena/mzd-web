@@ -7,21 +7,24 @@ import { ESTADOS_ORDEM, ESTADO_LABEL, PERFIL_LABEL } from '../types';
 import type { Perfil } from '../types';
 
 const DESCRICAO_ETAPA: Record<string, string> = {
-  recepcao: 'Registo da viatura, queixa do cliente, estado de entrada e assinatura.',
+  recepcao: 'Registo da viatura e da queixa. O mecânico preenche a ficha de entrada em papel com o cliente, que a assina; a receção digitaliza-a.',
   diagnostico: 'O mecânico inspeciona cada sistema e regista o parecer técnico.',
   orcamentacao: 'Peças e mão de obra são orçamentadas com base no diagnóstico.',
-  aguarda_aprovacao: 'O cliente aprova o diagnóstico e o orçamento num único passo (na oficina, por mensagem ou no link do portal).',
-  em_reparacao: 'Execução dos trabalhos aprovados; pode parar à espera de peças.',
+  aguarda_aprovacao: 'O cliente aceita o diagnóstico e o orçamento num único passo: no link, assinando a pró-forma na oficina ou por mensagem/telefone. Tem 10 dias; depois conta parqueamento.',
+  em_reparacao: 'Começa com o pagamento da aceitação (100% das peças e 60% da mão de obra). Pode parar à espera de peças.',
   controlo_qualidade: 'O chefe de oficina verifica o trabalho e os itens de segurança.',
-  pronta_entrega: 'Fatura emitida; o cliente é avisado para levantar a viatura.',
-  entregue: 'Pagamento concluído e viatura entregue com o termo de garantia.',
+  pronta_entrega: 'Fatura emitida; o cliente é avisado e tem 5 dias úteis para levantar. Depois conta parqueamento, faturado à parte.',
+  entregue: 'Pagamento concluído (o resto da mão de obra e o parqueamento, se houver) e viatura entregue com o termo de garantia.',
 };
 
 const GUIAS: Record<Perfil, string[]> = {
   rececao: [
     'Conduz o processo inteiro: os técnicos não usam o sistema, por isso é a receção que regista o que eles fazem.',
-    'Receção: "Nova receção" ou "Receção" numa marcação; atribua logo o técnico (Oficina ou no processo).',
+    'Receção: "Nova receção" (só viatura, cliente, queixa e prazo). Imprima a ficha de entrada e entregue-a ao técnico, que a preenche com o cliente.',
+    'Com a ficha assinada, digitalize-a (fotografia ou PDF) em "Carregar ficha assinada" e atribua o técnico.',
     'Diagnóstico: preencha o que o técnico encontrou, com fotografias. Depois o orçamento e o envio ao cliente (WhatsApp, email ou link).',
+    'Aceitação: o painel mostra as três formas — o cliente aceita no link (avança sozinho), assina a pró-forma na oficina, ou responde/liga. Registe o pagamento da aceitação: sem ele a reparação não começa.',
+    'Viatura pronta: avise o cliente (mensagem, telefone ou ao balcão). O prazo para levantar e o parqueamento só contam depois do aviso.',
     'Reparação: marque as tarefas feitas e registe as horas de cada técnico em "Registar horas".',
     'Controlo de qualidade, pagamento, recibo e entrega também são seus. Feche a caixa ao fim do dia.',
     'Descontos acima do limite e reabrir uma caixa fechada pedem a Direção.',
@@ -29,7 +32,7 @@ const GUIAS: Record<Perfil, string[]> = {
   rececionista: [
     'O painel mostra as chegadas de hoje, as viaturas prontas e os orçamentos à espera do cliente.',
     'Receção: "Nova receção" ou "Receção" numa marcação. A matrícula é procurada antes de criar cliente novo.',
-    'Atribua o mecânico logo na receção, para o diagnóstico começar.',
+    'Imprima a ficha de entrada para o mecânico; quando voltar assinada, digitalize-a no processo. Depois atribua o mecânico.',
     'Em Comunicações, "Por avisar" lista quem ainda não foi informado. O link de cada mensagem deixa o cliente acompanhar e aprovar.',
   ],
   administrativa: [
@@ -52,6 +55,8 @@ const GUIAS: Record<Perfil, string[]> = {
   direcao: [
     '"Pede atenção", no painel, junta o que precisa da sua decisão (descontos, caixas por fechar, atrasos).',
     'Descontos acima do limite definido esperam a sua aprovação em Financeiro → Descontos.',
+    'Exceções às condições: no processo, pode deixar começar a reparação sem o pagamento da aceitação ou dispensar o parqueamento (com motivo).',
+    'Em Definições: condições de pagamento, prazos, parqueamento, IVA e as contas (coordenadas) que saem na pró-forma e nas faturas.',
     'Relatórios por período, comparados com o período anterior, exportáveis para Excel (CSV).',
     'Em Administração: contas da equipa e auditoria de tudo o que é feito no sistema.',
   ],
@@ -67,6 +72,8 @@ const DUVIDAS: [string, string][] = [
   ['Registei um pagamento errado.', 'No processo, anule o pagamento com o motivo (só no próprio dia e com a caixa aberta) e registe o correto.'],
   ['A caixa de hoje já foi fechada.', 'Só a Direção a pode reabrir; a reabertura fica registada na auditoria.'],
   ['O cliente diz que não recebeu o WhatsApp.', 'O sistema abre a mensagem no seu WhatsApp; confirme que carregou em Enviar. Pode reenviar em Comunicações.'],
+  ['Como é que o cliente aceita o orçamento?', 'De três formas: no link que recebe por WhatsApp/email (carrega em «Aceitar orçamento» e o processo avança sozinho); na oficina, assinando a pró-forma impressa (registe a decisão com a fotografia da folha); ou respondendo à mensagem/ligando (registe a decisão com a captura).'],
+  ['Preciso de uma fatura sem IVA.', 'No orçamento, escolha «Sem IVA». O motivo da isenção (das Definições) sai na pró-forma e na fatura; os trabalhos adicionais seguem o mesmo regime.'],
   ['O link do portal foi parar a outra pessoa.', 'No processo → Comunicações, "Novo link": o anterior deixa de funcionar de imediato.'],
   ['Aparece "Há uma versão nova do sistema".', 'Foi publicada uma atualização; carregue em Recarregar. O que estava guardado não se perde.'],
 ];

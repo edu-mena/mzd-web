@@ -66,8 +66,25 @@ function Editor({ inicial }: { inicial: ConteudoSite }) {
         )}
       />
 
+      <Card>
+        <CardHeader title="Marcas que reparamos" subtitle="Aparecem logo a seguir à abertura, para quem não tem Mitsubishi saber que também é bem-vindo. Só o nome, sem logótipos." />
+        <div className="px-5 py-4">
+          <Field label="Marcas" hint="Separadas por vírgulas, pela ordem em que devem aparecer">
+            {(a) => (
+              <Textarea
+                {...a}
+                rows={2}
+                value={c.marcas.join(', ')}
+                onChange={(e) => set('marcas', e.target.value.split(',').map((x) => x.trim()).filter((x, i, l) => x.length > 0 || i === l.length - 1))}
+                onBlur={() => set('marcas', c.marcas.filter((x) => x.length >= 2))}
+              />
+            )}
+          </Field>
+        </div>
+      </Card>
+
       <Lista
-        titulo="Modelos Mitsubishi" subtitulo="Aparecem na secção interativa; escolher um leva-o para o pedido" max={12}
+        titulo="Especialidade Mitsubishi — modelos" subtitulo="Secção «A nossa especialidade»: escolher um modelo leva-o para o pedido" max={12}
         itens={c.modelos} onChange={(v) => set('modelos', v)}
         novo={() => ({ id: novoId(), nome: 'Novo modelo', descricao: 'O que fazemos neste modelo.', imagem: IMAGEM_VAZIA })}
         render={(x, mudar) => (

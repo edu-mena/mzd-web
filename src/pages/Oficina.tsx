@@ -166,6 +166,8 @@ function Cartao({ p, mecanicos, podeAtribuir, onAtribuir }: { p: ProcessoDetalha
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <StatusBadge estado={p.estado} className="!text-[10.5px]" />
         {p.aguardaPecas && <span className="rounded bg-sinal-ambar-fundo px-1.5 py-[3px] text-[10.5px] font-semibold text-sinal-ambar">Aguarda peças</span>}
+        {p.aguardaPagamento && <span className="rounded bg-sinal-ambar-fundo px-1.5 py-[3px] text-[10.5px] font-semibold text-sinal-ambar">Aguarda pagamento</span>}
+        {p.estado === 'recepcao' && !p.fichaRecepcao.assinaturaCliente && <span className="rounded bg-zinc-100 px-1.5 py-[3px] text-[10.5px] font-semibold text-mzd-gray">Ficha por digitalizar</span>}
       </div>
       {p.estado === 'em_reparacao' && tarefas.length > 0 && (
         <div className="mt-2">

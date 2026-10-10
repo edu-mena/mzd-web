@@ -15,10 +15,14 @@ import { movimentar, obterPeca, verificarFaltas } from './stock';
 import { avaliarDesconto, exigirCaixaAberta, proximoRecibo } from './financeiro';
 import { notificar, notificarMudanca } from './comunicacoes';
 import { can, PERMISSAO_ETAPA } from '../../auth/permissions';
-import { calcularTotais, faturaPaga, recebidoProcesso, saldoEmAberto, totalFaturavel } from '../../lib/calculos';
-import { ESTADOS_ORDEM, ESTADO_LABEL, METODO_APROVACAO_LABEL, estaAtivo } from '../../types';
+import {
+  calcularTotais, faltaPagamentoAceitacao, faturaPaga, recebidoProcesso, saldoEmAberto, textoCondicoes, totalFaturavel,
+} from '../../lib/calculos';
+import { parqueamentoPorFaturar, valorParqueamento } from '../../lib/parqueamento';
+import { formatAOA } from '../../lib/format';
+import { CANAL_AVISO_LABEL, ESTADOS_ORDEM, ESTADO_LABEL, METODO_APROVACAO_LABEL, estaAtivo } from '../../types';
 import type {
-  Autorizacao, OrcamentoAdicional,
+  Autorizacao, OrcamentoAdicional, CanalAviso, Fatura,
   Cliente, FinalidadeAnexo, FormaPagamento, ItemOrcamentoMaoObra, ItemOrcamentoPeca, MetodoAprovacao, Pagamento, Processo, Tarefa, Viatura,
 } from '../../types';
 
@@ -81,11 +85,23 @@ function exigirMecanicoDoProcesso(p: Processo, u: UtilizadorComSenha) {
   }
 }
 
+/**
+ * Condições de pagamento: a reparação só começa (tarefas, horas, conclusão) depois de recebido o pagamento
+ * da aceitação, salvo dispensa da Direção.
+ */
+function exigirPagamentoAceitacao(p: Processo) {
+  const falta = faltaPagamentoAceitacao(p);
+  if (p.estado === 'em_reparacao' && falta > 0) {
+    throw new ApiError(422, `A reparação só começa depois do pagamento da aceitação (faltam ${formatAOA(falta)}). A Direção pode dispensá-lo.`);
+  }
+}
+
+const numeroFatura = () => `FT-${new Date().getFullYear()}-${novoId('fatura', '')}`;
+
 function emitirFatura(p: Processo) {
   const base = db();
-  const numeroFatura = `FT-${new Date().getFullYear()}-${novoId('fatura', '')}`;
   p.fatura = {
-    numero: numeroFatura,
+    numero: numeroFatura(),
     data: new Date().toISOString(),
     valorTotal: totalFaturavel(p),
     pagamentos: [...(p.adiantamentos ?? [])],
@@ -147,6 +163,7 @@ export function decidirAdicional(p: Processo, a: OrcamentoAdicional, autor: Auto
 function bloqueioAvanco(p: Processo): string | null {
   switch (p.estado) {
     case 'recepcao':
+      if (!p.fichaRecepcao.assinaturaCliente) return 'Carregue a ficha de entrada preenchida e assinada pelo cliente antes de iniciar o diagnóstico.';
       return p.mecanicoId ? null : 'Atribua um mecânico antes de iniciar o diagnóstico.';
     case 'diagnostico':
       return p.diagnostico?.concluidoEm ? null : 'O diagnóstico tem de estar concluído antes de passar à orçamentação.';
@@ -158,6 +175,8 @@ function bloqueioAvanco(p: Processo): string | null {
     case 'aguarda_aprovacao':
       return p.autorizacao ? null : 'É necessário registar a aprovação do cliente (diagnóstico e orçamento) antes de iniciar a reparação.';
     case 'em_reparacao': {
+      const falta = faltaPagamentoAceitacao(p);
+      if (falta > 0) return `A reparação aguarda o pagamento da aceitação (faltam ${formatAOA(falta)}).`;
       if (p.aguardaPecas) return 'A reparação está parada à espera de peças.';
       const pendentes = (p.tarefas ?? []).filter((t) => !t.feita).length;
       if (pendentes) return `Ainda há ${pendentes} tarefa(s) de reparação por concluir.`;
@@ -168,10 +187,18 @@ function bloqueioAvanco(p: Processo): string | null {
     case 'controlo_qualidade':
       return p.checklistQualidade?.aprovado ? null : 'O controlo de qualidade tem de estar aprovado antes de a viatura ficar pronta.';
     case 'pronta_entrega':
-      return faturaPaga(p.fatura) ? 'Registe a entrega (quilometragem, combustível e assinatura do cliente).' : 'A fatura tem de estar totalmente paga antes da entrega.';
+      return pendenteEntrega(p) ?? 'Registe a entrega (quilometragem, combustível e assinatura do cliente).';
     default:
       return 'Este processo já não pode avançar.';
   }
+}
+
+/** O que ainda impede a entrega da viatura (pagamentos e parqueamento), ou null. */
+function pendenteEntrega(p: Processo): string | null {
+  if (!faturaPaga(p.fatura)) return 'A fatura tem de estar totalmente paga antes da entrega.';
+  if (parqueamentoPorFaturar(p).length) return 'Há parqueamento por faturar. Fature-o (ou peça à Direção para o dispensar) antes da entrega.';
+  if ((p.faturasParqueamento ?? []).some((f) => !faturaPaga(f))) return 'A fatura de parqueamento tem de estar paga antes da entrega.';
+  return null;
 }
 
 function exigirEtapa(p: Processo, u: UtilizadorComSenha) {
@@ -198,7 +225,8 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
 
   ['GET', '/processos/:id', ({ params }) => detalhar(obterProcesso(params.id), exigir('processos.ver'))],
 
-  // Receção: abre o processo, com cliente e viatura existentes ou novos.
+  // Receção: abre o processo, com cliente e viatura existentes ou novos. Só a queixa e o prazo:
+  // o estado de entrada vem depois, na ficha em papel preenchida pelo mecânico com o cliente.
   ['POST', '/processos', ({ body }) => {
     const u = exigir('processos.criar');
     const base = db();
@@ -216,7 +244,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     }
 
     const ficha = body?.ficha ?? {};
-    const km = numero(ficha.km, 'Quilometragem', { min: 0, max: 2_000_000, inteiro: true });
+    const queixaCliente = texto(ficha.queixaCliente, 'Queixa do cliente', 5, 1000);
 
     let viatura: Viatura | undefined;
     let dadosViatura: ReturnType<typeof validarViatura> | undefined;
@@ -226,7 +254,6 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       if (!cliente || viatura.clienteId !== cliente.id) throw new ApiError(422, 'A viatura selecionada pertence a outro cliente.');
       const emCurso = base.processos.find((p) => p.viaturaId === viatura!.id && estaAtivo(p.estado));
       if (emCurso) throw new ApiError(422, `Esta viatura já tem um processo em curso (${emCurso.numero}).`);
-      if (km < viatura.km) throw new ApiError(422, `A quilometragem não pode ser inferior à última registada (${viatura.km.toLocaleString('pt-PT')} km).`);
     } else {
       dadosViatura = validarViatura(body?.novaViatura);
     }
@@ -242,10 +269,9 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       auditar(u.id, 'criar', 'cliente', cliente.id, cliente.nome);
     }
     if (dadosViatura) {
-      viatura = criarViatura(dadosViatura, cliente!.id, km);
+      // A quilometragem fica registada quando a ficha de entrada for digitalizada.
+      viatura = criarViatura(dadosViatura, cliente!.id, 0);
       auditar(u.id, 'criar', 'viatura', viatura.id, viatura.matricula);
-    } else {
-      viatura!.km = km;
     }
     const clienteFinal = cliente!;
     const viaturaFinal = viatura!;
@@ -261,25 +287,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       prazoEntrega: prazo.toISOString(),
       atendenteId: u.id,
       urgente: !!body?.urgente,
-      fichaRecepcao: {
-        queixaCliente: texto(ficha.queixaCliente, 'Queixa do cliente', 5, 1000),
-        km,
-        combustivel: numero(ficha.combustivel, 'Combustível', { min: 0, max: 100 }),
-        bateria: umDe(ficha.bateria, ['boa', 'fraca', 'a_testar'] as const, 'Bateria'),
-        danos: Array.isArray(ficha.danos)
-          ? ficha.danos.slice(0, 40).map((d: any) => ({
-              x: numero(d.x, 'Dano', { min: 0, max: 100 }),
-              y: numero(d.y, 'Dano', { min: 0, max: 100 }),
-              tipo: umDe(d.tipo, ['risco', 'mossa', 'outro'] as const, 'Tipo de dano'),
-              vista: umDe(d.vista, ['topo', 'perfil'] as const, 'Vista'),
-              nota: d.nota ? String(d.nota).slice(0, 200) : undefined,
-            }))
-          : [],
-        pertences: String(ficha.pertences ?? '').trim().slice(0, 500) || 'Nenhum',
-        dataHora: agora,
-        assinaturaCliente: false,
-        atendenteId: u.id,
-      },
+      fichaRecepcao: { queixaCliente, dataHora: agora, assinaturaCliente: false, atendenteId: u.id },
       portal: novoAcessoPortal(),
       historico: [],
     };
@@ -292,6 +300,40 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     }
     base.processos.push(p);
     auditar(u.id, 'criar', 'processo', p.id, p.numero);
+    return guardarEDetalhar(p, u);
+  }],
+
+  // Ficha de entrada preenchida em papel (mecânico + cliente, assinada) e digitalizada pela receção.
+  // Transcreve-se o que o sistema usa: quilómetros (obrigatório), combustível e pertences.
+  ['PUT', '/processos/:id/ficha-entrada', ({ params, body }) => {
+    const u = exigir('processos.criar');
+    const p = obterProcesso(params.id);
+    exigirEstado(p, 'recepcao', 'diagnostico');
+    const ids: unknown[] = Array.isArray(body?.digitalizacaoIds) ? body.digitalizacaoIds : [];
+    if (ids.length === 0) throw new ApiError(422, 'Junte a ficha digitalizada (fotografia ou PDF de cada página).');
+    if (ids.length > 10) throw new ApiError(422, 'Máximo de 10 páginas.');
+    const digitalizacaoIds = ids.map((id) => anexoValido(p, id, 'ficha_entrada', 'Página da ficha não encontrada. Volte a enviá-la.'));
+    // A quilometragem não pode recuar face às leituras de outros processos desta viatura.
+    const anterior = Math.max(0, ...db().processos
+      .filter((x) => x.viaturaId === p.viaturaId && x.id !== p.id)
+      .flatMap((x) => [x.fichaRecepcao.km ?? 0, x.entrega?.km ?? 0]));
+    const km = numero(body?.km, 'Quilometragem', { min: 0, max: 2_000_000, inteiro: true });
+    if (km < anterior) throw new ApiError(422, `A quilometragem não pode ser inferior à última registada (${anterior.toLocaleString('pt-PT')} km).`);
+    const combustivel = body?.combustivel === undefined || body?.combustivel === null ? undefined : numero(body.combustivel, 'Combustível', { min: 0, max: 100 });
+    const corrigir = p.fichaRecepcao.assinaturaCliente;
+    Object.assign(p.fichaRecepcao, {
+      km,
+      combustivel,
+      pertences: String(body?.pertences ?? '').trim().slice(0, 500) || 'Nenhum',
+      assinaturaCliente: true,
+      digitalizacaoIds,
+      digitalizadaEm: new Date().toISOString(),
+      digitalizadaPorId: u.id,
+    });
+    const viatura = db().viaturas.find((v) => v.id === p.viaturaId);
+    if (viatura && km > viatura.km) viatura.km = km;
+    registarHistorico(p, u.nome, `${corrigir ? 'Ficha de entrada substituída' : 'Ficha de entrada assinada e digitalizada'} (${digitalizacaoIds.length} página(s), ${km.toLocaleString('pt-PT')} km)`, 'documento');
+    auditar(u.id, 'ficha_entrada', 'processo', p.id, `${km} km`);
     return guardarEDetalhar(p, u);
   }],
 
@@ -368,12 +410,20 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     exigirEstado(p, 'orcamentacao');
     const config = db().configuracao;
     const desconto = avaliarDesconto(body?.desconto, p.orcamento?.desconto, u);
+    // Sem IVA: o documento leva o motivo legal (por omissão, o das definições).
+    const isencaoIva = body?.semIva ? texto(body?.motivoIsencaoIva || config.motivoIsencaoIva, 'Motivo da isenção de IVA', 3, 200) : undefined;
+    if (isencaoIva !== p.orcamento?.isencaoIva && (isencaoIva || p.orcamento?.isencaoIva)) {
+      registarHistorico(p, u.nome, isencaoIva ? `Orçamento sem IVA (${isencaoIva})` : `Orçamento com IVA (${config.taxaIva}%)`, 'nota');
+    }
+    // Validade e condições comerciais vêm das definições e ficam guardadas com o orçamento.
     p.orcamento = {
       pecas: validarLinhasPecas(body?.pecas),
       maoObra: validarLinhasMaoObra(body?.maoObra),
-      taxaIva: config.taxaIva,
-      validadeDias: numero(body?.validadeDias ?? config.validadeOrcamentoDias, 'Validade', { min: 1, max: 365, inteiro: true }),
-      condicoesPagamento: String(body?.condicoesPagamento ?? '').trim().slice(0, 300) || 'Pagamento na entrega',
+      taxaIva: isencaoIva ? 0 : config.taxaIva,
+      isencaoIva,
+      validadeDias: config.validadeOrcamentoDias,
+      condicoes: { ...config.condicoes },
+      condicoesPagamento: textoCondicoes(config.condicoes),
       estado: 'rascunho',
       desconto,
     };
@@ -398,22 +448,21 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     }
 
     const metodo = umDe(body?.metodo, METODOS, 'Método de aprovação');
-    const assinaturaAnexoId = metodo === 'presencial'
-      ? anexoValido(p, body?.assinaturaAnexoId, 'assinatura_aprovacao', 'Recolha a assinatura do cliente para a aprovação presencial.')
-      : undefined;
-    const comprovativoAnexoId = metodo === 'whatsapp' || metodo === 'email'
-      ? anexoValido(p, body?.comprovativoAnexoId, 'comprovativo_aprovacao', 'Anexe o comprovativo (captura da conversa ou do email) da aprovação.')
-      : undefined;
     if (metodo === 'portal') throw new ApiError(422, 'A aprovação no portal é feita pelo próprio cliente.');
+    // Na oficina: pró-forma impressa, assinada pelo cliente e digitalizada. WhatsApp/email: captura da resposta.
+    const comprovativoAnexoId = metodo === 'telefone'
+      ? undefined
+      : anexoValido(p, body?.comprovativoAnexoId, 'comprovativo_aprovacao', metodo === 'presencial'
+        ? 'Junte a pró-forma assinada pelo cliente (fotografia ou digitalização).'
+        : 'Anexe o comprovativo (captura da conversa ou do email) da aprovação.');
     const autorizadoPor = texto(body?.autorizadoPor, 'Nome de quem autorizou', 3, 120);
-    // Validar o adiantamento antes de alterar o processo.
-    let adiantamento: Pagamento | undefined;
+    // Pagamento da aceitação: validar antes de alterar o processo e registar antes de aprovar
+    // (assim os avisos à equipa já sabem se a reparação pode começar).
     if (body?.adiantamento && Number(body.adiantamento.valor) > 0) {
       if (!can(u, 'pagamentos.registar')) throw new ApiError(403, 'Não tem permissão para registar pagamentos.');
-      adiantamento = validarPagamento(body.adiantamento, p, u);
+      p.adiantamentos = [...(p.adiantamentos ?? []), validarPagamento(body.adiantamento, u, totalFaturavel(p) - recebidoProcesso(p))];
     }
-    aprovarOrcamento(p, u, { metodo, autorizadoPor, assinaturaAnexoId, comprovativoAnexoId, registadoPorId: u.id });
-    if (adiantamento) p.adiantamentos = [...(p.adiantamentos ?? []), adiantamento];
+    aprovarOrcamento(p, u, { metodo, autorizadoPor, comprovativoAnexoId, registadoPorId: u.id });
     return guardarEDetalhar(p, u);
   }],
 
@@ -426,6 +475,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     if (!t) throw new ApiError(404, 'Tarefa não encontrada.');
     const feita = !!body?.feita;
     if (feita === t.feita) return detalhar(p, u);
+    if (feita) exigirPagamentoAceitacao(p);
     // Montagem de peça do catálogo: baixa no stock ao marcar; devolução ao desmarcar.
     if (t.pecaId) {
       const peca = obterPeca(t.pecaId);
@@ -463,6 +513,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     const tecnico = u.perfil === 'mecanico' ? u.id : p.mecanicoId;
     if (!tecnico) throw new ApiError(422, 'Atribua um técnico ao processo primeiro.');
     if (acao === 'iniciar') {
+      exigirPagamentoAceitacao(p);
       const outro = db().processos.find((x) => (x.registosTempo ?? []).some((r) => !r.fim && r.mecanicoId === tecnico));
       if (outro) throw new ApiError(422, `Já há um cronómetro ativo para este técnico em ${outro.numero}. Pare-o primeiro.`);
       p.registosTempo = [...(p.registosTempo ?? []), { id: novoId('tempo', 'r'), mecanicoId: tecnico, inicio: agora, registadoPorId: tecnico === u.id ? undefined : u.id }];
@@ -480,6 +531,7 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     const p = obterProcesso(params.id);
     exigirEstado(p, 'em_reparacao', 'controlo_qualidade');
     exigirMecanicoDoProcesso(p, u);
+    exigirPagamentoAceitacao(p);
     const tecnico = db().utilizadores.find((x) => x.id === (body?.mecanicoId ?? p.mecanicoId) && x.perfil === 'mecanico' && x.ativo);
     if (!tecnico) throw new ApiError(422, 'Escolha o técnico que fez o trabalho.');
     if (u.perfil === 'mecanico' && tecnico.id !== u.id) throw new ApiError(403, 'Só pode registar as suas próprias horas.');
@@ -511,7 +563,9 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
       justificacao: texto(body?.justificacao, 'Justificação', 10, 1000),
       pecas,
       maoObra,
-      taxaIva: db().configuracao.taxaIva,
+      // O mesmo regime de IVA do orçamento aceite.
+      taxaIva: p.orcamento?.taxaIva ?? db().configuracao.taxaIva,
+      isencaoIva: p.orcamento?.isencaoIva,
       criadoEm: new Date().toISOString(),
       criadoPorId: u.id,
       estado: 'enviado' as const,
@@ -573,15 +627,83 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     return guardarEDetalhar(p, u);
   }],
 
+  // Pagamento de uma fatura (`fatura` = nº; por omissão a do serviço) ou, antes dela, adiantamento.
+  // Num processo cancelado só se pagam faturas de parqueamento.
   ['POST', '/processos/:id/pagamentos', ({ params, body }) => {
     const u = exigir('pagamentos.registar');
     const p = obterProcesso(params.id);
-    exigirEstado(p, 'em_reparacao', 'controlo_qualidade', 'pronta_entrega');
-    const pg = validarPagamento(body, p, u);
-    if (p.fatura) p.fatura.pagamentos.push(pg);
+    exigirEstado(p, 'em_reparacao', 'controlo_qualidade', 'pronta_entrega', 'cancelado');
+    const parqueamento = body?.fatura ? (p.faturasParqueamento ?? []).find((f) => f.numero === body.fatura) : undefined;
+    if (body?.fatura && !parqueamento && body.fatura !== p.fatura?.numero) throw new ApiError(404, 'Fatura não encontrada neste processo.');
+    if (!parqueamento && p.estado === 'cancelado') throw new ApiError(422, 'Este processo está cancelado: só se pagam faturas de parqueamento.');
+    const alvo: Fatura | undefined = parqueamento ?? p.fatura;
+    const pg = validarPagamento(body, u, alvo ? saldoEmAberto(alvo) : totalFaturavel(p) - recebidoProcesso(p));
+    const aguardavaPagamento = p.estado === 'em_reparacao' && faltaPagamentoAceitacao(p) > 0;
+    if (alvo) alvo.pagamentos.push(pg);
     else p.adiantamentos = [...(p.adiantamentos ?? []), pg];
-    registarHistorico(p, u.nome, `Pagamento registado: ${pg.valor.toLocaleString('pt-PT')} Kz (${pg.forma})`, 'nota');
+    if (aguardavaPagamento && faltaPagamentoAceitacao(p) === 0) {
+      notificar({ utilizadores: [p.mecanicoId], perfis: ['chefe_oficina'] }, 'Reparação pode começar', `${p.numero} — pagamento da aceitação recebido.`, `/processos/${p.id}`, u.id);
+    }
+    registarHistorico(p, u.nome, `Pagamento registado: ${pg.valor.toLocaleString('pt-PT')} Kz (${pg.forma})${parqueamento ? ` — parqueamento ${parqueamento.numero}` : ''}`, 'nota');
     auditar(u.id, 'pagamento', 'processo', p.id, String(pg.valor));
+    return guardarEDetalhar(p, u);
+  }],
+
+  // A Direção deixa a reparação começar sem o pagamento da aceitação (ex.: frotistas com conta).
+  ['POST', '/processos/:id/pagamento-aceitacao/dispensar', ({ params, body }) => {
+    const u = exigir('financeiro.supervisionar');
+    const p = obterProcesso(params.id);
+    exigirEstado(p, 'em_reparacao');
+    if (faltaPagamentoAceitacao(p) === 0) throw new ApiError(422, 'Não há pagamento da aceitação em falta.');
+    p.dispensaPagamentoAceitacao = { motivo: texto(body?.motivo, 'Motivo', 5, 200), data: new Date().toISOString(), porId: u.id };
+    registarHistorico(p, u.nome, `Reparação autorizada sem o pagamento da aceitação (${p.dispensaPagamentoAceitacao.motivo})`, 'nota');
+    auditar(u.id, 'dispensar_pagamento_aceitacao', 'processo', p.id, p.dispensaPagamentoAceitacao.motivo);
+    notificar({ utilizadores: [p.mecanicoId], perfis: ['chefe_oficina'] }, 'Reparação pode começar', `${p.numero} — autorizada pela Direção.`, `/processos/${p.id}`, u.id);
+    return guardarEDetalhar(p, u);
+  }],
+
+  // Aviso de que a viatura está pronta dado fora do sistema (telefone ou ao balcão). Os avisos por
+  // WhatsApp/email registam-se sozinhos ao enviar a mensagem. Conta o primeiro aviso.
+  ['POST', '/processos/:id/aviso-levantamento', ({ params, body }) => {
+    const u = exigir('mensagens.enviar');
+    const p = obterProcesso(params.id);
+    exigirEstado(p, 'pronta_entrega');
+    if (p.avisoLevantamento) throw new ApiError(422, 'O cliente já foi avisado de que a viatura está pronta.');
+    const canal: CanalAviso = umDe(body?.canal, ['telefone', 'presencial'] as const, 'Como avisou');
+    p.avisoLevantamento = { data: new Date().toISOString(), canal, porId: u.id };
+    registarHistorico(p, u.nome, `Cliente avisado de que a viatura está pronta (${CANAL_AVISO_LABEL[canal].toLowerCase()})`, 'nota');
+    auditar(u.id, 'aviso_levantamento', 'processo', p.id, canal);
+    return guardarEDetalhar(p, u);
+  }],
+
+  // Fatura de parqueamento com os dias ainda por faturar (até hoje). O valor por dia e o IVA vêm do orçamento.
+  ['POST', '/processos/:id/parqueamento/faturar', ({ params }) => {
+    const u = exigir('pagamentos.registar');
+    const p = obterProcesso(params.id);
+    exigirEstado(p, 'em_reparacao', 'controlo_qualidade', 'pronta_entrega', 'cancelado');
+    const periodos = parqueamentoPorFaturar(p);
+    if (!periodos.length || !p.orcamento) throw new ApiError(422, 'Não há parqueamento por faturar.');
+    const v = valorParqueamento(periodos, p.orcamento);
+    const fatura = {
+      numero: numeroFatura(), data: new Date().toISOString(), valorTotal: v.total, pagamentos: [],
+      periodos, valorDia: v.valorDia, taxaIva: v.taxaIva, isencaoIva: p.orcamento.isencaoIva,
+    };
+    p.faturasParqueamento = [...(p.faturasParqueamento ?? []), fatura];
+    registarHistorico(p, u.nome, `Fatura de parqueamento ${fatura.numero} emitida (${v.dias} dia(s))`, 'documento');
+    auditar(u.id, 'faturar_parqueamento', 'processo', p.id, `${fatura.numero} · ${v.total}`);
+    return guardarEDetalhar(p, u);
+  }],
+
+  ['POST', '/processos/:id/parqueamento/dispensar', ({ params, body }) => {
+    const u = exigir('financeiro.supervisionar');
+    const p = obterProcesso(params.id);
+    if (p.estado === 'entregue') throw new ApiError(422, 'A viatura já foi entregue.');
+    if (p.dispensaParqueamento) throw new ApiError(422, 'O parqueamento deste processo já foi dispensado.');
+    const dias = parqueamentoPorFaturar(p).reduce((s, x) => s + x.dias, 0);
+    if (!dias) throw new ApiError(422, 'Não há parqueamento por faturar.');
+    p.dispensaParqueamento = { motivo: texto(body?.motivo, 'Motivo', 5, 200), data: new Date().toISOString(), porId: u.id };
+    registarHistorico(p, u.nome, `Parqueamento dispensado pela Direção (${dias} dia(s); ${p.dispensaParqueamento.motivo})`, 'nota');
+    auditar(u.id, 'dispensar_parqueamento', 'processo', p.id, `${dias} dias · ${p.dispensaParqueamento.motivo}`);
     return guardarEDetalhar(p, u);
   }],
 
@@ -589,8 +711,10 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
     const u = exigir('entrega.registar');
     const p = obterProcesso(params.id);
     exigirEstado(p, 'pronta_entrega');
-    if (!faturaPaga(p.fatura)) throw new ApiError(422, 'A fatura tem de estar totalmente paga antes da entrega.');
-    const km = numero(body?.km, 'Quilometragem na entrega', { min: p.fichaRecepcao.km, max: p.fichaRecepcao.km + 2000, inteiro: true });
+    const pendente = pendenteEntrega(p);
+    if (pendente) throw new ApiError(422, pendente);
+    const kmEntrada = p.fichaRecepcao.km ?? 0;
+    const km = numero(body?.km, 'Quilometragem na entrega', { min: kmEntrada, max: kmEntrada + 2000, inteiro: true });
     const assinaturaAnexoId = anexoValido(p, body?.assinaturaAnexoId, 'assinatura_entrega', 'Recolha a assinatura do cliente na entrega.');
     p.entrega = {
       data: new Date().toISOString(),
@@ -628,9 +752,9 @@ export const rotasProcessos: [Metodo, string, Handler][] = [
   }],
 ];
 
-function validarPagamento(dados: any, p: Processo, u: UtilizadorComSenha): Pagamento {
+/** `emDivida`: o máximo que se pode pagar (saldo da fatura escolhida, ou o que falta do total aprovado). */
+function validarPagamento(dados: any, u: UtilizadorComSenha, emDivida: number): Pagamento {
   const forma = umDe(dados?.forma, FORMAS, 'Forma de pagamento');
-  const emDivida = p.fatura ? saldoEmAberto(p.fatura) : totalFaturavel(p) - recebidoProcesso(p);
   const valor = numero(dados?.valor, 'Valor', { min: 1 });
   if (valor > emDivida + 0.01) throw new ApiError(422, `O valor excede o montante em dívida (${Math.round(emDivida).toLocaleString('pt-PT')} Kz).`);
   const referencia = dados?.referencia ? String(dados.referencia).trim().slice(0, 60) : undefined;

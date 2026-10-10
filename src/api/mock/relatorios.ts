@@ -2,7 +2,7 @@
 //
 // Regras (o PHP deve replicá-las, idealmente em SQL agregado):
 // - O período é [de, ate] em dias locais, inclusive; o "anterior" tem a mesma duração e termina na véspera de `de`.
-// - Faturado conta pela data da fatura; recebido pela data de cada pagamento não anulado;
+// - Faturado conta pela data da fatura (serviço e parqueamento); recebido pela data de cada pagamento não anulado;
 //   entregas pela data da entrega; entradas pela data de receção.
 // - Valores só para `valores.ver`; custos e margens só para `pecas.editar`.
 // - Os alertas do painel são filtrados pelas permissões de quem pede.
@@ -16,7 +16,8 @@ import type { Handler } from './contexto';
 import { diaLocal } from './financeiro';
 import { reservado } from './stock';
 import { can } from '../../auth/permissions';
-import { calcularTotais, saldoEmAberto } from '../../lib/calculos';
+import { calcularTotais, faltaPagamentoAceitacao, faturasDe, saldoEmAberto } from '../../lib/calculos';
+import { parqueamentoPorFaturar } from '../../lib/parqueamento';
 import { ESTADOS_ORDEM, estaAtivo } from '../../types';
 import type { AlertaPainel, Comparacao, EstadoProcesso, Processo, Relatorio } from '../../types';
 
@@ -41,7 +42,9 @@ const pctOuNulo = (parte: number, todo: number) => (todo ? pct(parte, todo) : nu
 const um = (n: number) => Math.round(n * 10) / 10;
 
 const dataEntrega = (p: Processo) => p.entrega?.data ?? p.historico.find((h) => h.estado === 'entregue')?.data;
-const pagamentos = (p: Processo) => [...(p.fatura?.pagamentos ?? []), ...(p.adiantamentos ?? [])].filter((x) => !x.anulado);
+const pagamentos = (p: Processo) => [...faturasDe(p).flatMap((f) => f.pagamentos), ...(p.adiantamentos ?? [])].filter((x) => !x.anulado);
+const parqueamentoFaturado = (ps: Processo[], dentroDe: (iso: string) => boolean) =>
+  ps.flatMap((p) => p.faturasParqueamento ?? []).filter((f) => dentroDe(f.data)).reduce((s, f) => s + f.valorTotal, 0);
 /** Linhas aprovadas (orçamento + adicionais aprovados). */
 const linhasAprovadas = (p: Processo) => [
   ...(p.orcamento?.estado === 'aprovado' ? [p.orcamento] : []),
@@ -52,7 +55,8 @@ const linhasAprovadas = (p: Processo) => [
 function indicadores(i: Intervalo) {
   const ps = db().processos;
   const faturas = ps.filter((p) => dentro(p.fatura?.data, i));
-  const faturado = faturas.reduce((s, p) => s + p.fatura!.valorTotal, 0);
+  const servicos = faturas.reduce((s, p) => s + p.fatura!.valorTotal, 0);
+  const faturado = servicos + parqueamentoFaturado(ps, (d) => dentro(d, i));
   const recebido = ps.flatMap(pagamentos).filter((x) => dentro(x.data, i)).reduce((s, x) => s + x.valor, 0);
   const entregues = ps.filter((p) => dentro(dataEntrega(p), i));
   const noPrazo = entregues.filter((p) => dataEntrega(p)! <= p.prazoEntrega).length;
@@ -63,7 +67,8 @@ function indicadores(i: Intervalo) {
   return {
     faturado,
     recebido,
-    ticketMedio: faturas.length ? Math.round(faturado / faturas.length) : null,
+    // Valor médio por serviço (o parqueamento fica de fora).
+    ticketMedio: faturas.length ? Math.round(servicos / faturas.length) : null,
     entradas: ps.filter((p) => dentro(p.criadoEm, i)).length,
     entregas: entregues.length,
     cumprimentoPrazo: pctOuNulo(noPrazo, entregues.length),
@@ -107,7 +112,7 @@ function calcular(de: string, ate: string, u: UtilizadorComSenha): Relatorio {
       const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       return {
         mes,
-        faturado: ps.filter((p) => p.fatura && diaLocal(p.fatura.data).startsWith(mes)).reduce((s, p) => s + p.fatura!.valorTotal, 0),
+        faturado: ps.flatMap(faturasDe).filter((f) => diaLocal(f.data).startsWith(mes)).reduce((s, f) => s + f.valorTotal, 0),
         recebido: ps.flatMap(pagamentos).filter((x) => diaLocal(x.data).startsWith(mes)).reduce((s, x) => s + x.valor, 0),
       };
     });
@@ -118,6 +123,7 @@ function calcular(de: string, ate: string, u: UtilizadorComSenha): Relatorio {
       pecas: totais.reduce((s, t) => s + t.pecas, 0),
       maoObra: totais.reduce((s, t) => s + t.maoObra, 0),
       descontos: totais.reduce((s, t) => s + t.desconto, 0),
+      parqueamento: parqueamentoFaturado(ps, (d) => dentro(d, i)),
       margemPecas: custos && venda ? { venda, custo } : undefined,
       porMes,
     };
@@ -228,6 +234,16 @@ function alertas(u: UtilizadorComSenha): AlertaPainel[] {
       .filter((d) => d < hoje && d >= somaDias(hoje, -7) && !base.fechos.some((f) => f.dia === d)).sort();
     add(true, { id: 'caixa', gravidade: 'critico', titulo: diasAbertos.length === 1 ? `Caixa de ${diasAbertos[0].split('-').reverse().slice(0, 2).join('/')} por fechar` : plural(diasAbertos.length, 'dia', 'dias') + ' com a caixa por fechar', texto: 'Feche a caixa com a contagem do numerário.', link: '/faturacao', total: diasAbertos.length });
   }
+  if (can(u, 'pagamentos.registar')) {
+    const n = ativos.filter((p) => p.estado === 'em_reparacao' && faltaPagamentoAceitacao(p) > 0).length;
+    add(true, { id: 'pagamento-aceitacao', gravidade: 'aviso', titulo: plural(n, 'orçamento aceite sem o pagamento da aceitação', 'orçamentos aceites sem o pagamento da aceitação'), texto: 'A reparação só começa depois de receber este pagamento.', link: '/processos?estado=em_reparacao', total: n });
+    const parque = base.processos.filter((p) => (estaAtivo(p.estado) || p.estado === 'cancelado') && parqueamentoPorFaturar(p).length > 0).length;
+    add(true, { id: 'parqueamento', gravidade: 'info', titulo: plural(parque, 'viatura com parqueamento a contar', 'viaturas com parqueamento a contar'), texto: 'Cobrado à parte, antes de a viatura sair.', link: '/processos', total: parque });
+  }
+  if (can(u, 'processos.criar')) {
+    const n = ativos.filter((p) => p.estado === 'recepcao' && !p.fichaRecepcao.assinaturaCliente).length;
+    add(true, { id: 'fichas', gravidade: 'aviso', titulo: plural(n, 'ficha de entrada por digitalizar', 'fichas de entrada por digitalizar'), texto: 'O diagnóstico só começa com a ficha assinada pelo cliente.', link: '/processos?estado=recepcao', total: n });
+  }
   if (can(u, 'processos.ver')) {
     const n = ativos.filter((p) => new Date(p.prazoEntrega).getTime() < agora).length;
     add(true, { id: 'atrasos', gravidade: 'critico', titulo: plural(n, 'viatura com o prazo ultrapassado', 'viaturas com o prazo ultrapassado'), texto: 'A entrega prometida ao cliente já passou.', link: '/processos?filtro=atrasados', total: n });
@@ -252,7 +268,7 @@ function alertas(u: UtilizadorComSenha): AlertaPainel[] {
   }
   if (can(u, 'faturacao.ver')) {
     const limite = agora - 60 * DIA;
-    const antigas = base.processos.filter((p) => p.fatura && saldoEmAberto(p.fatura) > 0 && new Date(p.fatura.data).getTime() < limite);
+    const antigas = base.processos.flatMap(faturasDe).filter((f) => saldoEmAberto(f) > 0 && new Date(f.data).getTime() < limite);
     add(true, { id: 'dividas', gravidade: 'aviso', titulo: plural(antigas.length, 'fatura por pagar há mais de 60 dias', 'faturas por pagar há mais de 60 dias'), texto: 'Veja as dívidas por antiguidade.', link: '/faturacao', total: antigas.length });
   }
   if (can(u, 'mensagens.enviar')) {

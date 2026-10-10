@@ -9,22 +9,23 @@ import Drawer from '../../components/ui/Drawer';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Kz from '../../components/ui/Kz';
-import SignaturePad from '../../components/ui/SignaturePad';
 import { Aviso } from '../../components/ui/Controls';
 import { Checkbox, Escolha, Field, Input } from '../../components/ui/Form';
 import { MiniaturaPendente, SeletorFicheiros } from '../../components/ui/Anexos';
 import type { FicheiroPendente } from '../../components/ui/Anexos';
 import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
-import { calcularTotais } from '../../lib/calculos';
+import { calcularTotais, textoCondicoes, valorAceitacao } from '../../lib/calculos';
+import { LinkImprimir } from '../../documents/FichaRecepcaoDoc';
 
 const MOTIVOS = ['Preço elevado', 'Vai comparar orçamentos', 'Sem urgência', 'Vai vender a viatura', 'Outro'];
-const METODOS: { valor: MetodoAprovacao; label: string }[] = [
-  { valor: 'presencial', label: 'Presencial' },
-  { valor: 'whatsapp', label: 'WhatsApp' },
-  { valor: 'email', label: 'Email' },
-  { valor: 'telefone', label: 'Telefone' },
+const METODOS: { valor: MetodoAprovacao; label: string; descricao?: string }[] = [
+  { valor: 'presencial', label: 'Na oficina', descricao: 'Assinou a pró-forma' },
+  { valor: 'whatsapp', label: 'WhatsApp', descricao: 'Respondeu à mensagem' },
+  { valor: 'email', label: 'Email', descricao: 'Respondeu ao email' },
+  { valor: 'telefone', label: 'Telefone', descricao: 'Sem comprovativo' },
 ];
+const METODOS_ADICIONAL = METODOS.map(({ valor, label }) => ({ valor, label }));
 
 /** Regista a decisão do cliente sobre o diagnóstico e o orçamento (num único passo). */
 export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalhado; onFechar: () => void }) {
@@ -32,15 +33,16 @@ export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalh
   const acao = useAcaoProcesso();
   const { can } = useAuth();
   const total = calcularTotais(processo.orcamento).total;
+  const aceitacao = valorAceitacao(processo.orcamento);
   const [decisao, setDecisao] = useState<'aprovado' | 'recusado'>();
   const [metodo, setMetodo] = useState<MetodoAprovacao>();
   const [autorizadoPor, setAutorizadoPor] = useState(processo.cliente.nome);
-  const [assinatura, setAssinatura] = useState<Blob | null>(null);
   const [comprovativo, setComprovativo] = useState<FicheiroPendente | null>(null);
   const [motivo, setMotivo] = useState<string>();
   const [motivoOutro, setMotivoOutro] = useState('');
-  const [comAdiantamento, setComAdiantamento] = useState(false);
-  const [adiantamento, setAdiantamento] = useState<{ valor: string; forma?: FormaPagamento; referencia: string }>({ valor: String(Math.round(total / 2)), referencia: '' });
+  // O pagamento da aceitação costuma ser feito no momento (na oficina); se não for, a reparação espera por ele.
+  const [comAdiantamento, setComAdiantamento] = useState(can('pagamentos.registar'));
+  const [adiantamento, setAdiantamento] = useState<{ valor: string; forma?: FormaPagamento; referencia: string }>({ valor: String(aceitacao), referencia: '' });
   const [aGuardar, setAGuardar] = useState(false);
 
   async function confirmar() {
@@ -53,15 +55,14 @@ export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalh
         await acao.mutateAsync(() => api.processos.registarAprovacao(processo.id, { decisao: 'recusado', motivoRecusa: m }));
         toast('Recusa registada — processo cancelado');
       } else {
-        if (!metodo) throw new Error('Indique como o cliente aprovou.');
-        let assinaturaAnexoId: string | undefined;
+        if (!metodo) throw new Error('Indique como o cliente aceitou.');
         let comprovativoAnexoId: string | undefined;
-        if (metodo === 'presencial') {
-          if (!assinatura) throw new Error('Recolha a assinatura do cliente.');
-          assinaturaAnexoId = (await api.anexos.enviar(processo.id, assinatura, { tipo: 'assinatura', finalidade: 'assinatura_aprovacao', nome: 'assinatura-aprovacao.png' })).id;
-        }
-        if ((metodo === 'whatsapp' || metodo === 'email') && comprovativo) {
-          comprovativoAnexoId = (await api.anexos.enviar(processo.id, comprovativo.ficheiro, { tipo: 'documento', finalidade: 'comprovativo_aprovacao', nome: comprovativo.nome, legenda: 'Comprovativo de aprovação' })).id;
+        if (metodo !== 'telefone') {
+          if (!comprovativo) throw new Error(metodo === 'presencial' ? 'Junte a fotografia (ou PDF) da pró-forma assinada.' : 'Anexe a captura da resposta do cliente.');
+          comprovativoAnexoId = (await api.anexos.enviar(processo.id, comprovativo.ficheiro, {
+            tipo: 'documento', finalidade: 'comprovativo_aprovacao', nome: comprovativo.nome,
+            legenda: metodo === 'presencial' ? 'Pró-forma assinada pelo cliente' : 'Comprovativo de aceitação',
+          })).id;
         }
         let pagamento: DadosPagamento | undefined;
         if (comAdiantamento) {
@@ -70,10 +71,10 @@ export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalh
         }
         await acao.mutateAsync(() =>
           api.processos.registarAprovacao(processo.id, {
-            decisao: 'aprovado', metodo, autorizadoPor, assinaturaAnexoId, comprovativoAnexoId, adiantamento: pagamento,
+            decisao: 'aprovado', metodo, autorizadoPor, comprovativoAnexoId, adiantamento: pagamento,
           })
         );
-        toast('Aprovação registada — reparação iniciada');
+        toast(pagamento && Number(pagamento.valor) >= aceitacao ? 'Aceitação registada — a reparação pode começar' : 'Aceitação registada — a reparação começa com o pagamento da aceitação');
       }
       onFechar();
     } catch (e) {
@@ -88,12 +89,12 @@ export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalh
       open
       onClose={onFechar}
       titulo="Decisão do cliente"
-      subtitulo={<>Diagnóstico e orçamento · total <Kz valor={total} className="font-semibold text-mzd-black" /> com IVA</>}
+      subtitulo={<>Diagnóstico e orçamento · total <Kz valor={total} className="font-semibold text-mzd-black" /> {processo.orcamento?.isencaoIva ? 'sem IVA' : 'com IVA'}</>}
       rodape={
         <>
           <Button variante="fantasma" onClick={onFechar}>Cancelar</Button>
           <Button variante={decisao === 'recusado' ? 'perigo' : 'primario'} onClick={confirmar} carregando={aGuardar} disabled={!decisao}>
-            {decisao === 'recusado' ? 'Registar recusa' : 'Registar aprovação'}
+            {decisao === 'recusado' ? 'Registar recusa' : 'Registar aceitação'}
           </Button>
         </>
       }
@@ -104,7 +105,7 @@ export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalh
           valor={decisao}
           onChange={setDecisao}
           opcoes={[
-            { valor: 'aprovado', label: 'Aprovou', descricao: 'Inicia a reparação', tom: 'ok' },
+            { valor: 'aprovado', label: 'Aceitou', descricao: 'Segue para a reparação', tom: 'ok' },
             { valor: 'recusado', label: 'Recusou', descricao: 'Cancela o processo', tom: 'alerta' },
           ]}
         />
@@ -121,33 +122,43 @@ export function FormAprovacao({ processo, onFechar }: { processo: ProcessoDetalh
 
         {decisao === 'aprovado' && (
           <>
-            <Escolha label="Como aprovou" valor={metodo} onChange={setMetodo} opcoes={METODOS} />
-            <Field label="Nome de quem autorizou">{(a) => <Input {...a} value={autorizadoPor} onChange={(e) => setAutorizadoPor(e.target.value)} />}</Field>
+            <Escolha label="Como aceitou" valor={metodo} onChange={(m) => { setMetodo(m); setComprovativo(null); }} opcoes={METODOS} />
+            <Field label="Nome de quem aceitou">{(a) => <Input {...a} value={autorizadoPor} onChange={(e) => setAutorizadoPor(e.target.value)} />}</Field>
 
-            {metodo === 'presencial' && (
+            {metodo && metodo !== 'telefone' && (
               <div>
-                <p className="mb-1.5 text-xs font-semibold text-mzd-black">Assinatura</p>
-                <SignaturePad onChange={setAssinatura} legenda={`${autorizadoPor} autoriza a reparação pelo valor de ${total.toLocaleString('pt-PT')} Kz`} altura={160} />
-              </div>
-            )}
-            {(metodo === 'whatsapp' || metodo === 'email') && (
-              <div>
-                <p className="mb-1.5 text-xs font-semibold text-mzd-black">Comprovativo (captura da conversa ou do email)</p>
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-mzd-black">
+                    {metodo === 'presencial' ? 'Pró-forma assinada pelo cliente (fotografia ou PDF)' : 'Comprovativo (captura da conversa ou do email)'}
+                  </p>
+                  {metodo === 'presencial' && <LinkImprimir processoId={processo.id} documento="proforma">Imprimir pró-forma</LinkImprimir>}
+                </div>
                 {comprovativo ? (
                   <div className="w-28"><MiniaturaPendente f={comprovativo} onRemover={() => setComprovativo(null)} /></div>
                 ) : (
-                  <SeletorFicheiros aceitarVideo={false} rotulo="Anexar captura de ecrã" onEscolher={(f) => setComprovativo(f[0] ?? null)} />
+                  <SeletorFicheiros
+                    aceitarVideo={false}
+                    aceitarPdf={metodo === 'presencial'}
+                    rotulo={metodo === 'presencial' ? 'Fotografar a pró-forma assinada' : 'Anexar captura de ecrã'}
+                    onEscolher={(f) => setComprovativo(f[0] ?? null)}
+                  />
                 )}
               </div>
             )}
-            {metodo === 'telefone' && <Aviso tom="neutro">Aprovação por telefone não tem comprovativo. Fica registado quem a recebeu e quando.</Aviso>}
+            {metodo === 'telefone' && <Aviso tom="neutro">A aceitação por telefone não tem comprovativo. Fica registado quem a recebeu e quando.</Aviso>}
 
             {can('pagamentos.registar') && (
               <div className="rounded-md border border-linha bg-white p-4">
-                <Checkbox checked={comAdiantamento} onChange={setComAdiantamento}>Registar adiantamento agora</Checkbox>
+                <Checkbox checked={comAdiantamento} onChange={setComAdiantamento}>
+                  O cliente pagou a aceitação agora
+                  {processo.orcamento && <span className="block text-xs font-normal text-mzd-gray">{textoCondicoes(processo.orcamento.condicoes)}</span>}
+                </Checkbox>
+                {!comAdiantamento && (
+                  <p className="mt-2 text-xs text-sinal-ambar">A reparação fica à espera do pagamento de <Kz valor={aceitacao} /> (a Direção pode dispensá-lo).</p>
+                )}
                 {comAdiantamento && (
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Valor (Kz)" hint={`50% = ${Math.round(total / 2).toLocaleString('pt-PT')} Kz`}>
+                    <Field label="Valor (Kz)" hint={`Pagamento da aceitação: ${aceitacao.toLocaleString('pt-PT')} Kz`}>
                       {(a) => <Input {...a} value={adiantamento.valor} onChange={(e) => setAdiantamento({ ...adiantamento, valor: e.target.value.replace(/\D/g, '') })} inputMode="numeric" className="num" />}
                     </Field>
                     <Field label="Referência" hint="Obrigatória em transferência e Multicaixa">
@@ -206,7 +217,7 @@ export function DecisaoAdicional({ processo, adicional, onFechar }: { processo: 
         <p className="text-sm text-mzd-black">{adicional.justificacao}</p>
         <p className="text-sm">Valor: <Kz valor={calcularTotais(adicional).total} className="font-semibold" /> com IVA</p>
         <Escolha label="O cliente…" valor={decisao} onChange={setDecisao} opcoes={[{ valor: 'aprovado', label: 'Aprovou', tom: 'ok' }, { valor: 'recusado', label: 'Recusou', tom: 'alerta' }]} />
-        <Escolha label="Comunicado por" valor={metodo} onChange={setMetodo} opcoes={METODOS} />
+        <Escolha label="Comunicado por" valor={metodo} onChange={setMetodo} opcoes={METODOS_ADICIONAL} />
         <Field label="Nome de quem decidiu">{(a) => <Input {...a} value={autorizadoPor} onChange={(e) => setAutorizadoPor(e.target.value)} />}</Field>
       </div>
     </Modal>

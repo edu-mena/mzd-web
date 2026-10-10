@@ -92,7 +92,7 @@ export default function ViaturaDetail() {
                   <span className="num w-24 text-xs text-mzd-gray">{formatDate(p.criadoEm)}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-mzd-black">{p.fichaRecepcao.queixaCliente}</span>
-                    <span className="num block text-xs text-mzd-gray">{p.numero} · {p.fichaRecepcao.km.toLocaleString('pt-PT')} km</span>
+                    <span className="num block text-xs text-mzd-gray">{p.numero}{p.fichaRecepcao.km !== undefined && ` · ${p.fichaRecepcao.km.toLocaleString('pt-PT')} km`}</span>
                   </span>
                   {can('valores.ver') && p.orcamento && <Kz valor={calcularTotais(p.orcamento).total} className="text-[13px] text-mzd-gray" />}
                   <StatusBadge estado={p.estado} />

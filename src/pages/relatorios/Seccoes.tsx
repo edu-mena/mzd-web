@@ -64,6 +64,13 @@ export function Negocio({ r }: { r: Relatorio }) {
               <dt className="rotulo">Descontos concedidos</dt>
               <dd className="num mt-1 text-lg font-semibold">{formatAOA(n.descontos)}</dd>
             </div>
+            {n.parqueamento > 0 && (
+              <div className="px-5 py-3.5">
+                <dt className="rotulo">Parqueamento faturado</dt>
+                <dd className="num mt-1 text-lg font-semibold">{formatAOA(n.parqueamento)}</dd>
+                <dd className="mt-0.5 text-[11px] text-mzd-gray">Faturas próprias, com IVA quando aplicável</dd>
+              </div>
+            )}
             {margem !== null && (
               <div className="px-5 py-3.5">
                 <dt className="rotulo">Margem bruta nas peças</dt>

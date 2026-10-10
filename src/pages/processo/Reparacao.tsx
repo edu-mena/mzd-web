@@ -36,6 +36,8 @@ export default function Reparacao({ processo }: { processo: ProcessoDetalhado })
   const [otimista, setOtimista] = useState<Record<string, boolean>>({});
 
   const executar = can('reparacao.executar') && (user?.perfil !== 'mecanico' || processo.mecanicoId === user.id);
+  // Sem o pagamento da aceitação (ou dispensa da Direção) não se começa: nada de horas nem tarefas feitas.
+  const parado = !!processo.aguardaPagamento;
   // O cronómetro é de quem trabalha; quem gere o processo (ex.: a receção) regista as horas em nome do técnico.
   const ehMecanico = user?.perfil === 'mecanico';
   const [registarHoras, setRegistarHoras] = useState(false);
@@ -72,7 +74,7 @@ export default function Reparacao({ processo }: { processo: ProcessoDetalhado })
           {horasOrcadas > 0 && horas > horasOrcadas && <p className="text-xs font-semibold text-sinal-ambar">Acima do tempo orçamentado</p>}
         </div>
         {executar && !ehMecanico && (
-          <Button variante="secundario" className="ml-auto" icone={<Clock size={15} />} onClick={() => setRegistarHoras(true)}>Registar horas</Button>
+          <Button variante="secundario" className="ml-auto" icone={<Clock size={15} />} onClick={() => setRegistarHoras(true)} disabled={parado}>Registar horas</Button>
         )}
         {executar && ehMecanico && (
           <div className="ml-auto flex items-center gap-3">
@@ -81,6 +83,7 @@ export default function Reparacao({ processo }: { processo: ProcessoDetalhado })
               variante={meu ? 'perigo' : 'primario'}
               icone={meu ? <Pause size={15} /> : <Play size={15} />}
               carregando={acao.isPending}
+              disabled={parado && !meu}
               onClick={() => correr(() => api.processos.cronometro(processo.id, meu ? 'parar' : 'iniciar'), meu ? 'Cronómetro parado' : 'Cronómetro iniciado')}
             >
               {meu ? 'Parar trabalho' : 'Iniciar trabalho'}
@@ -145,7 +148,7 @@ export default function Reparacao({ processo }: { processo: ProcessoDetalhado })
             <li key={t.id} className={clsx('rounded-md border px-3 py-2.5', t.descricao.startsWith('Corrigir:') ? 'border-mzd-red/40 bg-sinal-vermelho-fundo/40' : 'border-linha bg-white')}>
               <Checkbox
                 checked={feita(t)}
-                disabled={!executar}
+                disabled={!executar || (parado && !feita(t))}
                 onChange={(v) => {
                   setOtimista((o) => ({ ...o, [t.id]: v }));
                   acao.mutate(() => api.processos.marcarTarefa(processo.id, t.id, v), {

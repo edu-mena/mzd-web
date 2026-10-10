@@ -10,7 +10,7 @@ import { SearchInput, Segmented } from '../../components/ui/Controls';
 import { Table, Th, Tr, Td, LinhaVazia } from '../../components/ui/Table';
 import { Carregando, ErroCarregamento } from '../../components/ui/Estados';
 import { formatAOA, formatDate, diasEntre } from '../../lib/format';
-import { saldoEmAberto, valorPago } from '../../lib/calculos';
+import { faturasDe, saldoEmAberto, valorPago } from '../../lib/calculos';
 
 type Filtro = 'todas' | 'abertas' | 'pagas';
 
@@ -21,21 +21,22 @@ export default function Faturas() {
   if (isPending) return <Carregando />;
   if (error) return <ErroCarregamento erro={error} onRepetir={refetch} />;
 
-  const todas = processos.filter((p) => p.fatura);
+  // Faturas do serviço e de parqueamento, cada uma na sua linha.
+  const todas = processos.flatMap((p) => faturasDe(p).map((fat) => ({ p, fat, parqueamento: fat !== p.fatura })));
   const q = query.toLowerCase();
   const faturas = todas
-    .filter((p) =>
-      p.fatura!.numero.toLowerCase().includes(q) ||
+    .filter(({ p, fat }) =>
+      fat.numero.toLowerCase().includes(q) ||
       p.cliente.nome.toLowerCase().includes(q) ||
       p.viatura.matricula.toLowerCase().includes(q)
     )
-    .filter((p) => (filtro === 'abertas' ? saldoEmAberto(p.fatura) > 0 : filtro === 'pagas' ? saldoEmAberto(p.fatura) === 0 : true))
-    .sort((a, b) => b.fatura!.data.localeCompare(a.fatura!.data));
+    .filter(({ fat }) => (filtro === 'abertas' ? saldoEmAberto(fat) > 0 : filtro === 'pagas' ? saldoEmAberto(fat) === 0 : true))
+    .sort((a, b) => b.fat.data.localeCompare(a.fat.data));
 
-  const totalFaturado = todas.reduce((s, p) => s + p.fatura!.valorTotal, 0);
-  const totalRecebido = todas.reduce((s, p) => s + valorPago(p.fatura), 0);
-  const totalPorReceber = todas.reduce((s, p) => s + saldoEmAberto(p.fatura), 0);
-  const abertas = todas.filter((p) => saldoEmAberto(p.fatura) > 0).length;
+  const totalFaturado = todas.reduce((s, x) => s + x.fat.valorTotal, 0);
+  const totalRecebido = todas.reduce((s, x) => s + valorPago(x.fat), 0);
+  const totalPorReceber = todas.reduce((s, x) => s + saldoEmAberto(x.fat), 0);
+  const abertas = todas.filter((x) => saldoEmAberto(x.fat) > 0).length;
 
   return (
     <div className="space-y-5">
@@ -70,14 +71,14 @@ export default function Faturas() {
             </tr>
           </thead>
           <tbody>
-            {faturas.map((p) => {
-              const fat = p.fatura!;
+            {faturas.map(({ p, fat, parqueamento }) => {
               const saldo = saldoEmAberto(fat);
               const dias = diasEntre(fat.data);
               return (
-                <Tr key={p.id}>
+                <Tr key={fat.numero}>
                   <Td>
                     <Link to={`/processos/${p.id}`} className="num font-semibold text-mzd-black underline-offset-4 hover:underline">{fat.numero}</Link>
+                    {parqueamento && <span className="rotulo ml-2">parqueamento</span>}
                   </Td>
                   <Td className="text-mzd-black">{p.cliente.nome}</Td>
                   <Td><Matricula valor={p.viatura.matricula} tamanho="sm" /></Td>

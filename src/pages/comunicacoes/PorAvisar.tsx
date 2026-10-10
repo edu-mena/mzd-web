@@ -13,8 +13,9 @@ import { haQuanto } from '../../lib/datas';
 /** Ordem de urgência: o que bloqueia a oficina ou o cliente primeiro. */
 const GRUPOS: { motivo: ComunicacaoPendente['motivo']; titulo: string; descricao: string; limiteHoras: number }[] = [
   { motivo: 'orcamento', titulo: 'Orçamentos por enviar', descricao: 'A reparação só começa depois da resposta do cliente.', limiteHoras: 4 },
+  { motivo: 'pagamento', titulo: 'Pagamentos da aceitação em falta', descricao: 'O cliente aceitou, mas a reparação só começa depois do pagamento.', limiteHoras: 4 },
   { motivo: 'adicional', titulo: 'Trabalho adicional por aprovar', descricao: 'A viatura pode estar parada à espera da decisão.', limiteHoras: 2 },
-  { motivo: 'pronta', titulo: 'Viaturas prontas por avisar', descricao: 'Cada dia sem aviso é um dia de viatura parada no pátio.', limiteHoras: 4 },
+  { motivo: 'pronta', titulo: 'Viaturas prontas por avisar', descricao: 'O prazo para levantar (e o parqueamento depois dele) só conta a partir do aviso.', limiteHoras: 4 },
   { motivo: 'rececao', titulo: 'Receções por confirmar', descricao: 'Confirmação com número de processo e prazo.', limiteHoras: 12 },
   { motivo: 'marcacao', titulo: 'Marcações por lembrar', descricao: 'Marcações até ao próximo dia útil ainda não confirmadas.', limiteHoras: 999 },
   { motivo: 'divida', titulo: 'Pagamentos em atraso', descricao: 'Faturas com mais de 30 dias, sem lembrete na última semana.', limiteHoras: 999 },

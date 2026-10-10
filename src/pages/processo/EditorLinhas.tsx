@@ -16,6 +16,7 @@ export default function EditorLinhas({
   maoObra,
   onChange,
   taxaIva,
+  isento = false,
   valorHora,
   descontoPct = 0,
 }: {
@@ -23,6 +24,8 @@ export default function EditorLinhas({
   maoObra: ItemOrcamentoMaoObra[];
   onChange: (l: { pecas: ItemOrcamentoPeca[]; maoObra: ItemOrcamentoMaoObra[] }) => void;
   taxaIva: number;
+  /** Orçamento sem IVA (mostra "isento" em vez da taxa). */
+  isento?: boolean;
   valorHora: number;
   /** Desconto (%) em pré-visualização — aplicado antes do IVA. */
   descontoPct?: number;
@@ -126,7 +129,7 @@ export default function EditorLinhas({
         <div className="flex justify-between"><dt className="text-mzd-gray">Peças</dt><dd><Kz valor={totais.pecas} /></dd></div>
         <div className="flex justify-between"><dt className="text-mzd-gray">Mão de obra</dt><dd><Kz valor={totais.maoObra} /></dd></div>
         {totais.desconto > 0 && <div className="flex justify-between text-sinal-vermelho"><dt>Desconto ({descontoPct}%)</dt><dd>−<Kz valor={totais.desconto} /></dd></div>}
-        <div className="flex justify-between"><dt className="text-mzd-gray">IVA ({taxaIva}%)</dt><dd><Kz valor={totais.iva} /></dd></div>
+        <div className="flex justify-between"><dt className="text-mzd-gray">{isento ? 'IVA (isento)' : `IVA (${taxaIva}%)`}</dt><dd><Kz valor={totais.iva} /></dd></div>
         <div className="flex justify-between border-t border-mzd-black pt-1.5 text-base font-bold"><dt>Total</dt><dd><Kz valor={totais.total} /></dd></div>
       </dl>
     </div>

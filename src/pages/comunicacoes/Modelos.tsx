@@ -13,7 +13,7 @@ import { Carregando } from '../../components/ui/Estados';
 import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
 import { formatDate } from '../../lib/format';
-import { MODELOS_PADRAO, preencherModelo, VALORES_EXEMPLO, VARIAVEIS_MODELO, variaveisDesconhecidas } from '../../lib/mensagens';
+import { MODELOS_PADRAO, preencherModelo, textoCoordenadas, VALORES_EXEMPLO, VARIAVEIS_MODELO, variaveisDesconhecidas } from '../../lib/mensagens';
 
 /** Texto do modelo com as variáveis destacadas. */
 function TextoComVariaveis({ texto }: { texto: string }) {
@@ -68,7 +68,7 @@ function EditorModelo({ modelo, onFechar }: { modelo: ModeloMensagem; onFechar: 
   const [d, setD] = useState({ nome: modelo.nome, assunto: modelo.assunto, texto: modelo.texto });
   const area = useRef<HTMLTextAreaElement>(null);
   const desconhecidas = variaveisDesconhecidas(`${d.assunto}\n${d.texto}`);
-  const exemplo = { ...VALORES_EXEMPLO, oficina: config?.empresa.nome ?? VALORES_EXEMPLO.oficina, telefone_oficina: config?.empresa.telefone, iban: config?.empresa.iban };
+  const exemplo = { ...VALORES_EXEMPLO, oficina: config?.empresa.nome ?? VALORES_EXEMPLO.oficina, telefone_oficina: config?.empresa.telefone, coordenadas: textoCoordenadas(config?.coordenadasPagamento) ?? VALORES_EXEMPLO.coordenadas, iban: config?.coordenadasPagamento[0]?.iban ?? VALORES_EXEMPLO.iban };
   const original = MODELOS_PADRAO.find((x) => x.chave === modelo.chave);
   const igualOriginal = !!original && original.nome === d.nome && original.assunto === d.assunto && original.texto === d.texto;
 

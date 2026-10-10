@@ -4,7 +4,7 @@
 import { ApiError } from '../client';
 import type { Metodo } from '../client';
 import { db, definirSessao, guardar, reporDemo, sessaoAtual } from './db';
-import { auditar, exigir, novoId, obterProcesso, publico, utilizadorAtual } from './contexto';
+import { auditar, exigir, novoId, numero, obterProcesso, publico, texto, utilizadorAtual } from './contexto';
 import type { Handler } from './contexto';
 import { rotasProcessos } from './processos';
 import { rotasClientes } from './clientes';
@@ -82,9 +82,7 @@ const rotas: [Metodo, string, Handler][] = [
   }],
   ['PUT', '/configuracao', ({ body }) => {
     const u = exigir('definicoes.gerir');
-    const nova = body as Configuracao;
-    if (!(nova.taxaIva >= 0 && nova.taxaIva <= 100)) throw new ApiError(422, 'Taxa de IVA inválida.');
-    if (!(nova.valorHora > 0)) throw new ApiError(422, 'O valor por hora tem de ser positivo.');
+    const nova = validarConfiguracao(body);
     db().configuracao = nova;
     auditar(u.id, 'atualizar', 'configuracao');
     guardar();
@@ -101,6 +99,49 @@ const rotas: [Metodo, string, Handler][] = [
     return undefined;
   }],
 ];
+
+/** As definições alimentam documentos e regras de cobrança: validar tudo (o PHP faz o mesmo). */
+function validarConfiguracao(b: any): Configuracao {
+  const inteiro = (v: unknown, campo: string, min: number, max: number) => numero(v, campo, { min, max, inteiro: true });
+  const iban = /^AO\d{2}(\s?\d){21}$/;
+  const coordenadas = (Array.isArray(b?.coordenadasPagamento) ? b.coordenadasPagamento : []).map((c: any, i: number) => {
+    const valor = texto(c?.iban, `Conta ${i + 1}: IBAN`, 10, 40).toUpperCase();
+    if (!iban.test(valor)) throw new ApiError(422, `Conta ${i + 1}: IBAN inválido (AO + 23 algarismos).`);
+    return {
+      id: String(c?.id ?? '').slice(0, 40) || `cb${Date.now().toString(36)}${i}`,
+      banco: texto(c?.banco, `Conta ${i + 1}: banco`, 2, 80),
+      titular: texto(c?.titular, `Conta ${i + 1}: titular`, 3, 120),
+      iban: valor,
+      conta: c?.conta ? String(c.conta).trim().slice(0, 40) || undefined : undefined,
+    };
+  });
+  if (coordenadas.length > 5) throw new ApiError(422, 'Máximo de 5 contas.');
+  return {
+    empresa: {
+      nome: texto(b?.empresa?.nome, 'Nome comercial', 2, 120),
+      nif: texto(b?.empresa?.nif, 'NIF', 5, 30),
+      morada: texto(b?.empresa?.morada, 'Morada', 2, 200),
+      telefone: texto(b?.empresa?.telefone, 'Telefone', 6, 30),
+      email: texto(b?.empresa?.email, 'Email', 5, 120),
+    },
+    coordenadasPagamento: coordenadas,
+    instrucoesPagamento: b?.instrucoesPagamento ? String(b.instrucoesPagamento).trim().slice(0, 300) || undefined : undefined,
+    taxaIva: numero(b?.taxaIva, 'Taxa de IVA', { min: 0, max: 100 }),
+    motivoIsencaoIva: texto(b?.motivoIsencaoIva, 'Motivo da isenção de IVA', 3, 200),
+    valorHora: numero(b?.valorHora, 'Mão de obra (Kz/hora)', { min: 1 }),
+    validadeOrcamentoDias: inteiro(b?.validadeOrcamentoDias, 'Validade do orçamento', 1, 90),
+    condicoes: {
+      pecasAceitacaoPct: numero(b?.condicoes?.pecasAceitacaoPct, 'Peças pagas na aceitação (%)', { min: 0, max: 100 }),
+      maoObraAceitacaoPct: numero(b?.condicoes?.maoObraAceitacaoPct, 'Mão de obra paga na aceitação (%)', { min: 0, max: 100 }),
+      parqueamentoDia: numero(b?.condicoes?.parqueamentoDia, 'Parqueamento por dia', { min: 0 }),
+      diasUteisLevantamento: inteiro(b?.condicoes?.diasUteisLevantamento, 'Dias úteis para levantar', 0, 60),
+    },
+    garantiaPecasMeses: inteiro(b?.garantiaPecasMeses, 'Garantia de peças', 0, 120),
+    garantiaMaoObraMeses: inteiro(b?.garantiaMaoObraMeses, 'Garantia de mão de obra', 0, 120),
+    capacidadeDiaria: inteiro(b?.capacidadeDiaria, 'Capacidade diária', 1, 100),
+    descontoMaximoPct: numero(b?.descontoMaximoPct, 'Desconto sem aprovação', { min: 0, max: 100 }),
+  };
+}
 
 // ---------- Despacho ----------
 
@@ -140,7 +181,8 @@ export async function handle<T>(method: Metodo, path: string, body?: unknown): P
 // ---------- Envio de ficheiros ----------
 
 const LIMITES = { foto: 10 * 1024 * 1024, video: 60 * 1024 * 1024, documento: 10 * 1024 * 1024, assinatura: 1024 * 1024 };
-const FINALIDADES: FinalidadeAnexo[] = ['assinatura_recepcao', 'assinatura_aprovacao', 'comprovativo_aprovacao', 'assinatura_entrega'];
+// Ficha de entrada e pró-forma assinadas chegam em papel: digitalizadas (foto ou PDF).
+const FINALIDADES: FinalidadeAnexo[] = ['ficha_entrada', 'comprovativo_aprovacao', 'assinatura_entrega'];
 
 /** POST /processos/:id/anexos (multipart): ficheiro, tipo, finalidade?, legenda? */
 export async function handleUpload<T>(path: string, form: FormData): Promise<T> {
@@ -186,10 +228,6 @@ export async function handleUpload<T>(path: string, form: FormData): Promise<T> 
     autorId: u.id,
   };
   db().anexos.push(anexo);
-  if (finalidade === 'assinatura_recepcao') {
-    p.fichaRecepcao.assinaturaAnexoId = id;
-    p.fichaRecepcao.assinaturaCliente = true;
-  }
   auditar(u.id, 'anexar', 'processo', p.id, `${tipo}${finalidade ? ` (${finalidade})` : ''}`);
   guardar();
   return structuredClone(anexo) as T;

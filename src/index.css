@@ -142,6 +142,7 @@
 ::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-400); }
 
 @media print {
+  @page { size: A4; margin: 10mm; }
   .no-print { display: none !important; }
   body { background: white; }
   .pagina > * { animation: none; }

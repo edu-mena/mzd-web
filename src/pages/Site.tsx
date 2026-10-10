@@ -12,18 +12,19 @@ import FormPedido from './site/FormPedido';
 import Modal from '../components/ui/Modal';
 import iconMzd from '../assets/icon.png';
 
+// Oficina multimarca: os serviços vêm primeiro; a Mitsubishi aparece como especialidade, não como limite.
 const NAV = [
-  { id: 'modelos', label: 'Mitsubishi' },
   { id: 'servicos', label: 'Serviços' },
+  { id: 'marcas', label: 'Marcas' },
   { id: 'como-funciona', label: 'Como funciona' },
-  { id: 'oficina', label: 'Oficina' },
+  { id: 'modelos', label: 'Especialidade Mitsubishi' },
   { id: 'contactos', label: 'Contactos' },
 ];
 
 const PASSOS = [
   { titulo: 'Pede o orçamento', texto: 'Pelo formulário, por WhatsApp ou por telefone. Combinamos o dia em que traz a viatura.' },
   { titulo: 'Diagnóstico com fotografias', texto: 'Inspecionamos cada sistema e registamos o que encontrámos, com fotografias.' },
-  { titulo: 'Aprova pelo telemóvel', texto: 'Recebe um link pessoal com o diagnóstico e o orçamento. Só avançamos depois do seu "sim".' },
+  { titulo: 'Aceita pelo telemóvel', texto: 'Recebe um link pessoal com o diagnóstico e o orçamento. Só avançamos depois de aceitar.' },
   { titulo: 'Acompanha e levanta', texto: 'Vê cada etapa em tempo real e é avisado quando a viatura está pronta, com garantia escrita.' },
 ];
 
@@ -44,7 +45,7 @@ function Pagina({ site }: { site: ConteudoSite }) {
   const [servico, setServico] = useState('');
   const [ativo, setAtivo] = useState(0);
   const [creditos, setCreditos] = useState(false);
-  const zap = linkWhatsApp(site.contactos.whatsapp, 'Olá, gostaria de pedir um orçamento para o meu Mitsubishi.');
+  const zap = linkWhatsApp(site.contactos.whatsapp, 'Olá, gostaria de pedir um orçamento para a minha viatura.');
   const m = site.modelos[ativo] ?? site.modelos[0];
 
   useEffect(() => {
@@ -149,11 +150,88 @@ function Pagina({ site }: { site: ConteudoSite }) {
           </ul>
         </section>
 
-        {/* Modelos: escolher um mostra a fotografia e leva o modelo para o pedido */}
+        {/* Marcas: deixa claro, logo à entrada, que se reparam todas (sem logótipos de terceiros) */}
+        {site.marcas.length > 0 && (
+          <section id="marcas" aria-labelledby="t-marcas" className="scroll-mt-16 border-b border-linha bg-papel">
+            <div className="mx-auto grid max-w-7xl gap-6 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-center lg:px-8">
+              <div className="revelar">
+                <h2 id="t-marcas" className="font-display text-2xl font-extrabold leading-tight [font-stretch:115%]">Reparamos todas as marcas.</h2>
+                <p className="mt-2 text-[14.5px] leading-relaxed text-mzd-graphite">
+                  Ligeiros, jipes e pick-ups. E, para quem tem Mitsubishi, a experiência de uma oficina{' '}
+                  <a href="#modelos" className="font-semibold text-mzd-black underline decoration-mzd-red decoration-2 underline-offset-4">especializada na marca</a>.
+                </p>
+              </div>
+              <ul className="revelar flex flex-wrap gap-2" aria-label="Marcas que reparamos">
+                {site.marcas.map((x) => (
+                  <li key={x}>
+                    <button
+                      type="button"
+                      onClick={() => pedir({ modelo: x })}
+                      className={clsx('rounded-full border px-4 py-2 text-[13.5px] font-semibold transition-colors hover:border-mzd-black',
+                        x === 'Mitsubishi' ? 'border-mzd-black bg-mzd-black text-white hover:bg-mzd-graphite' : 'border-linha-forte bg-white text-mzd-black')}
+                    >
+                      {x}
+                    </button>
+                  </li>
+                ))}
+                <li><span className="inline-block px-2 py-2 text-[13.5px] text-mzd-gray">e outras</span></li>
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {/* Serviços */}
+        <section id="servicos" aria-labelledby="t-servicos" className="scroll-mt-16 bg-mzd-black py-20 text-white sm:py-28">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <TituloSeccao numero="01" rotulo="Serviços" id="t-servicos" titulo="Tudo o que a sua viatura precisa." claro>
+              Cada trabalho começa com um diagnóstico e um orçamento que aprova antes de mexermos na viatura.
+            </TituloSeccao>
+            <ul className="mt-12 grid gap-px overflow-hidden rounded-[3px] bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+              {site.servicos.map((s, i) => (
+                <li key={s.id} className="revelar group relative bg-mzd-black">
+                  <div className="relative aspect-[16/10] overflow-hidden">
+                    <Imagem imagem={s.imagem} className="h-full w-full object-cover opacity-70 transition duration-700 group-hover:scale-105 group-hover:opacity-90" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-mzd-black to-transparent" />
+                    <span className="num absolute left-5 top-4 text-xs text-zinc-300">{String(i + 1).padStart(2, '0')}</span>
+                  </div>
+                  <div className="relative -mt-10 px-5 pb-6">
+                    <h3 className="font-display text-xl font-extrabold [font-stretch:110%]">{s.titulo}</h3>
+                    <p className="mt-2 text-[14px] leading-relaxed text-zinc-300">{s.descricao}</p>
+                    <button type="button" onClick={() => pedir({ servico: s.titulo })} className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-white underline decoration-mzd-red decoration-2 underline-offset-[6px]">
+                      Pedir este serviço <ArrowRight size={14} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Como funciona */}
+        <section id="como-funciona" aria-labelledby="t-como" className="mx-auto max-w-7xl scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+          <TituloSeccao numero="02" rotulo="Como funciona" id="t-como" titulo="Sem surpresas na fatura.">
+            Sabe sempre o que se passa com a sua viatura — e nada é feito sem a sua aprovação.
+          </TituloSeccao>
+          <ol className="mt-14 grid gap-10 md:grid-cols-4 md:gap-6">
+            {PASSOS.map((p, i) => (
+              <li key={p.titulo} className="revelar relative">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-mzd-black font-display text-sm font-extrabold">{i + 1}</span>
+                  {i < PASSOS.length - 1 && <span className="hidden h-px flex-1 bg-linha-forte md:block" aria-hidden />}
+                </div>
+                <h3 className="mt-5 text-lg font-extrabold text-mzd-black">{p.titulo}</h3>
+                <p className="mt-1.5 text-[14.5px] leading-relaxed text-mzd-graphite">{p.texto}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* Especialidade: modelos Mitsubishi — escolher um mostra a fotografia e leva o modelo para o pedido */}
         {site.modelos.length > 0 && (
-          <section id="modelos" aria-labelledby="t-modelos" className="mx-auto max-w-7xl scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-            <TituloSeccao numero="01" rotulo="Mitsubishi" id="t-modelos" titulo="Conhecemos cada modelo por dentro.">
-              Do Pajero à L200, sabemos onde cada um costuma falhar e como o deixar pronto para a estrada e para a picada.
+          <section id="modelos" aria-labelledby="t-modelos" className="scroll-mt-16 border-t border-linha bg-white"><div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+            <TituloSeccao numero="03" rotulo="A nossa especialidade" id="t-modelos" titulo="Mitsubishi, conhecido por dentro.">
+              Reparamos todas as marcas, mas é na Mitsubishi que temos mais anos de prática. Do Pajero à L200, sabemos onde cada modelo
+              costuma falhar e como o deixar pronto para a estrada e para a picada.
             </TituloSeccao>
             <div className="revelar mt-12 grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
               <div role="tablist" aria-label="Modelos Mitsubishi" className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-0 lg:overflow-visible lg:pb-0">
@@ -189,64 +267,18 @@ function Pagina({ site }: { site: ConteudoSite }) {
                 </div>
                 <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
                   <p className="max-w-lg text-[15.5px] leading-relaxed text-mzd-graphite">{m.descricao}</p>
-                  <button type="button" onClick={() => pedir({ modelo: m.nome })} className="group inline-flex items-center gap-1.5 text-[14px] font-bold text-mzd-black underline decoration-mzd-red decoration-2 underline-offset-[6px]">
+                  <button type="button" onClick={() => pedir({ modelo: `Mitsubishi ${m.nome}` })} className="group inline-flex items-center gap-1.5 text-[14px] font-bold text-mzd-black underline decoration-mzd-red decoration-2 underline-offset-[6px]">
                     Pedir serviço para o {m.nome} <ArrowUpRight size={16} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   </button>
                 </div>
               </div>
             </div>
-          </section>
+          </div></section>
         )}
-
-        {/* Serviços */}
-        <section id="servicos" aria-labelledby="t-servicos" className="scroll-mt-16 bg-mzd-black py-20 text-white sm:py-28">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <TituloSeccao numero="02" rotulo="Serviços" id="t-servicos" titulo="Tudo o que o seu Mitsubishi precisa." claro>
-              Cada trabalho começa com um diagnóstico e um orçamento que aprova antes de mexermos na viatura.
-            </TituloSeccao>
-            <ul className="mt-12 grid gap-px overflow-hidden rounded-[3px] bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
-              {site.servicos.map((s, i) => (
-                <li key={s.id} className="revelar group relative bg-mzd-black">
-                  <div className="relative aspect-[16/10] overflow-hidden">
-                    <Imagem imagem={s.imagem} className="h-full w-full object-cover opacity-70 transition duration-700 group-hover:scale-105 group-hover:opacity-90" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-mzd-black to-transparent" />
-                    <span className="num absolute left-5 top-4 text-xs text-zinc-300">{String(i + 1).padStart(2, '0')}</span>
-                  </div>
-                  <div className="relative -mt-10 px-5 pb-6">
-                    <h3 className="font-display text-xl font-extrabold [font-stretch:110%]">{s.titulo}</h3>
-                    <p className="mt-2 text-[14px] leading-relaxed text-zinc-300">{s.descricao}</p>
-                    <button type="button" onClick={() => pedir({ servico: s.titulo })} className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-white underline decoration-mzd-red decoration-2 underline-offset-[6px]">
-                      Pedir este serviço <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* Como funciona */}
-        <section id="como-funciona" aria-labelledby="t-como" className="mx-auto max-w-7xl scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-          <TituloSeccao numero="03" rotulo="Como funciona" id="t-como" titulo="Sem surpresas na fatura.">
-            Sabe sempre o que se passa com a sua viatura — e nada é feito sem a sua aprovação.
-          </TituloSeccao>
-          <ol className="mt-14 grid gap-10 md:grid-cols-4 md:gap-6">
-            {PASSOS.map((p, i) => (
-              <li key={p.titulo} className="revelar relative">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-mzd-black font-display text-sm font-extrabold">{i + 1}</span>
-                  {i < PASSOS.length - 1 && <span className="hidden h-px flex-1 bg-linha-forte md:block" aria-hidden />}
-                </div>
-                <h3 className="mt-5 text-lg font-extrabold text-mzd-black">{p.titulo}</h3>
-                <p className="mt-1.5 text-[14.5px] leading-relaxed text-mzd-graphite">{p.texto}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
 
         {/* Galeria */}
         {site.galeria.length > 0 && (
-          <section id="oficina" aria-labelledby="t-oficina" className="scroll-mt-16 border-t border-linha bg-white py-20 sm:py-28">
+          <section id="oficina" aria-labelledby="t-oficina" className="scroll-mt-16 border-t border-linha bg-papel py-20 sm:py-28">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <TituloSeccao numero="04" rotulo="A oficina" id="t-oficina" titulo="Trabalho feito com cuidado." />
               <div className="mt-12"><Galeria imagens={site.galeria} /></div>
@@ -288,7 +320,7 @@ function Pagina({ site }: { site: ConteudoSite }) {
             </div>
             <div className="revelar">
               <FormPedido
-                modelos={site.modelos.map((x) => x.nome)}
+                sugestoes={[...site.marcas, ...site.modelos.map((x) => `Mitsubishi ${x.nome}`)]}
                 servicos={site.servicos.map((x) => x.titulo)}
                 modelo={modelo}
                 setModelo={setModelo}
@@ -304,7 +336,7 @@ function Pagina({ site }: { site: ConteudoSite }) {
         <div className="mx-auto flex max-w-7xl flex-wrap items-start justify-between gap-8 px-4 py-12 sm:px-6 lg:px-8">
           <div className="max-w-sm">
             <p className="font-display text-xl font-extrabold text-white [font-stretch:125%]">MZD<span className="text-mzd-red">.</span></p>
-            <p className="mt-1 text-sm">Carros e Motores · Especialistas em Mitsubishi</p>
+            <p className="mt-1 text-sm">Carros e Motores · Todas as marcas · Especialistas em Mitsubishi</p>
             <p className="mt-4 text-xs leading-relaxed">{AVISO_MARCA}</p>
           </div>
           <nav aria-label="Rodapé">

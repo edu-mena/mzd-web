@@ -29,7 +29,7 @@ import type {
   Viatura,
 } from '../../types';
 import { ESTADOS_ORDEM, ESTADO_LABEL, SISTEMAS_VEICULO, VERIFICACOES_SEGURANCA } from '../../types';
-import { calcularTotais } from '../../lib/calculos';
+import { calcularTotais, textoCondicoes, valorAceitacao } from '../../lib/calculos';
 import { MODELOS_PADRAO, preencherModelo, valoresDoContexto } from '../../lib/mensagens';
 import { CONTEUDO_SITE_PADRAO } from '../../lib/site';
 
@@ -46,7 +46,7 @@ export interface NotificacaoInterna {
   lidaPor: string[];
 }
 
-export const VERSAO_DB = 15;
+export const VERSAO_DB = 16;
 export const SENHA_DEMO = 'mzd2026';
 
 export type UtilizadorComSenha = Utilizador & { senha: string };
@@ -213,9 +213,17 @@ export function criarSeed(): MockDB {
       telefone: '+244 923 000 000',
       email: 'geral@mzdcarros.ao',
     },
+    // Contas de demonstração (IBAN fictício): a Direção define as reais em Definições.
+    coordenadasPagamento: [
+      { id: 'cb1', banco: 'BAI — Banco Angolano de Investimento', titular: 'MZD Carros e Motores, Lda.', iban: 'AO06 0040 0000 1234 5678 1019 6', conta: '123456781' },
+      { id: 'cb2', banco: 'BFA — Banco de Fomento Angola', titular: 'MZD Carros e Motores, Lda.', iban: 'AO06 0006 0000 9876 5432 1011 7' },
+    ],
+    instrucoesPagamento: 'Indique o nº do processo no descritivo da transferência e envie o comprovativo por WhatsApp.',
     taxaIva: 14,
+    motivoIsencaoIva: 'Isento de IVA',
     valorHora: 8500,
-    validadeOrcamentoDias: 15,
+    validadeOrcamentoDias: 10,
+    condicoes: { pecasAceitacaoPct: 100, maoObraAceitacaoPct: 60, parqueamentoDia: 2000, diasUteisLevantamento: 5 },
     garantiaPecasMeses: 6,
     garantiaMaoObraMeses: 3,
     capacidadeDiaria: 6,
@@ -260,7 +268,17 @@ export function criarSeed(): MockDB {
 
     // Idade coerente com a etapa: ativos recentes (mais avançados = mais antigos), entregues ao longo
     // de 6 meses (para haver histórico de faturação) e cancelados nas últimas semanas.
+    // Demonstrações das regras comerciais (índices da distribuição acima):
+    // - 0: acabado de abrir, à espera da ficha de entrada em papel;
+    // - 6: orçamento sem resposta além da validade (parqueamento a contar);
+    // - 8: aceite, à espera do pagamento da aceitação para começar;
+    // - 13: pronta, cliente avisado há mais de 5 dias úteis (parqueamento a contar);
+    // - 15: entregue, faturado sem IVA.
+    const fichaPorDigitalizar = i === 0;
+    const aguardaPagamento = i === 8;
+    const semIva = i === 15;
     const diasAtras =
+      i === 6 ? 16 : i === 13 ? 15 :
       estado === 'entregue' ? int(3, 170) : cancelado ? int(4, 50) : int(Math.floor(idx / 2), idx + 2);
     const criadoEm = new Date(agora - diasAtras * 86400000 - int(1, 8) * 3600000);
     const prazoEntrega = new Date(criadoEm.getTime() + int(Math.max(2, Math.ceil(idx / 2)), idx + 4) * 86400000);
@@ -299,9 +317,11 @@ export function criarSeed(): MockDB {
       ? {
           pecas: pecasOrc,
           maoObra: maoObraOrc,
-          taxaIva: configuracao.taxaIva,
+          taxaIva: semIva ? 0 : configuracao.taxaIva,
+          isencaoIva: semIva ? configuracao.motivoIsencaoIva : undefined,
           validadeDias: configuracao.validadeOrcamentoDias,
-          condicoesPagamento: '50% na autorização, 50% na entrega',
+          condicoes: { ...configuracao.condicoes },
+          condicoesPagamento: textoCondicoes(configuracao.condicoes),
           enviadoEm: datasEtapa.aguarda_aprovacao,
           estado: cancelado
             ? ('recusado' as const)
@@ -315,18 +335,18 @@ export function criarSeed(): MockDB {
       : undefined;
     const total = calcularTotais(orcamento).total;
 
-    // Pagamentos: adiantamento de 50% em parte dos casos; restante na entrega.
+    // Pagamentos: na aceitação (peças + parte da mão de obra) e o restante no levantamento.
     const pagamentos: Pagamento[] = [];
-    const comAdiantamento = chegou('em_reparacao') && rnd() > 0.4;
-    if (comAdiantamento) {
+    const aceitacao = valorAceitacao(orcamento);
+    if (chegou('em_reparacao') && !aguardaPagamento) {
       pagamentos.push({
-        id: `pg${++seqPagamento}`, numeroRecibo: '', data: datasEtapa.em_reparacao!, valor: Math.round(total / 2),
+        id: `pg${++seqPagamento}`, numeroRecibo: '', data: datasEtapa.em_reparacao!, valor: aceitacao,
         forma: pick(['transferencia', 'tpa', 'multicaixa']), referencia: `REF${int(100000, 999999)}`, registadoPorId: 'u5',
       });
     }
     if (estado === 'entregue') {
       pagamentos.push({
-        id: `pg${++seqPagamento}`, numeroRecibo: '', data: datasEtapa.entregue!, valor: total - (comAdiantamento ? Math.round(total / 2) : 0),
+        id: `pg${++seqPagamento}`, numeroRecibo: '', data: datasEtapa.entregue!, valor: Math.round((total - aceitacao) * 100) / 100,
         forma: pick(['numerario', 'numerario', 'tpa', 'multicaixa']), registadoPorId: 'u5',
       });
     }
@@ -352,11 +372,11 @@ export function criarSeed(): MockDB {
           ...maoObraOrc.map((m) => ({ descricao: m.descricao, origem: 'mao_obra' as const })),
           ...pecasOrc.map((pc) => ({ descricao: `Montar ${pc.descricao}${pc.quantidade > 1 ? ` (×${pc.quantidade})` : ''}`, origem: 'peca' as const, pecaId: pc.pecaId, quantidade: pc.quantidade })),
         ].map((t) => {
-          const feita = chegou('controlo_qualidade') || rnd() > 0.5;
+          const feita = chegou('controlo_qualidade') || (!aguardaPagamento && rnd() > 0.5);
           return { id: `t${++seqTarefa}`, ...t, feita, feitaPorId: feita ? mecanicoId : undefined, feitaEm: feita ? datasEtapa.em_reparacao : undefined };
         })
       : undefined;
-    const registosTempo = chegou('em_reparacao')
+    const registosTempo = chegou('em_reparacao') && !aguardaPagamento
       ? [{
           id: `r${++seqTempo}`,
           mecanicoId,
@@ -364,7 +384,7 @@ export function criarSeed(): MockDB {
           fim: new Date(Math.min(new Date(datasEtapa.em_reparacao!).getTime() + int(1, 7) * 3600000, agora)).toISOString(),
         }]
       : undefined;
-    const aguardaPecas = estado === 'em_reparacao' && rnd() > 0.7;
+    const aguardaPecas = estado === 'em_reparacao' && !aguardaPagamento && rnd() > 0.7;
 
     if (cancelado) {
       historico.push({
@@ -393,17 +413,19 @@ export function criarSeed(): MockDB {
       tarefas,
       registosTempo,
       adiantamentos: chegou('em_reparacao') && !chegou('pronta_entrega') ? pagamentos : undefined,
-      fichaRecepcao: {
-        queixaCliente: pick(queixas),
-        km: viatura.km - int(0, 500),
-        combustivel: int(10, 100),
-        bateria: pick(['boa', 'fraca', 'a_testar']),
-        danos: [{ x: int(20, 80), y: int(20, 80), tipo: 'risco', vista: 'topo' }],
-        pertences: pick(['Nenhum', 'Documentos no porta-luvas', 'Triângulo e colete', 'Óculos de sol']),
-        dataHora: criadoEm.toISOString(),
-        assinaturaCliente: true,
-        atendenteId,
-      },
+      fichaRecepcao: fichaPorDigitalizar
+        ? { queixaCliente: pick(queixas), dataHora: criadoEm.toISOString(), assinaturaCliente: false, atendenteId }
+        : {
+            queixaCliente: pick(queixas),
+            km: viatura.km - int(0, 500),
+            combustivel: int(10, 100),
+            bateria: pick(['boa', 'fraca', 'a_testar']),
+            danos: [{ x: int(20, 80), y: int(20, 80), tipo: 'risco', vista: 'topo' }],
+            pertences: pick(['Nenhum', 'Documentos no porta-luvas', 'Triângulo e colete', 'Óculos de sol']),
+            dataHora: criadoEm.toISOString(),
+            assinaturaCliente: true,
+            atendenteId,
+          },
       diagnostico: chegou('diagnostico')
         ? {
             itens: itensDiag,
@@ -437,6 +459,10 @@ export function criarSeed(): MockDB {
             { item: 'Peças instaladas', tipo: 'peca', prazoMeses: configuracao.garantiaPecasMeses },
             { item: 'Mão de obra', tipo: 'mao_obra', prazoMeses: configuracao.garantiaMaoObraMeses },
           ]
+        : undefined,
+      // Cliente avisado pouco depois de a viatura ficar pronta (o aviso do índice 13 vem da mensagem, mais abaixo).
+      avisoLevantamento: estado === 'entregue'
+        ? { data: new Date(new Date(datasEtapa.pronta_entrega!).getTime() + 3600000).toISOString(), canal: 'whatsapp', porId: 'u1' }
         : undefined,
       entrega: estado === 'entregue'
         ? {
@@ -559,8 +585,9 @@ export function criarSeed(): MockDB {
     for (const h of p.historico) {
       const chave = h.estado && MODELO_ETAPA[h.estado];
       if (!chave) continue;
-      // Na etapa atual de um processo em curso, cerca de metade ainda está por avisar.
-      if (h.estado === p.estado && p.estado !== 'entregue' && rndMsg() < 0.5) continue;
+      // Na etapa atual de um processo em curso, cerca de metade ainda está por avisar
+      // (o processo com parqueamento a contar foi avisado de certeza).
+      if (h.estado === p.estado && p.estado !== 'entregue' && rndMsg() < 0.5 && p.id !== 'proc14') continue;
       if (h.estado === 'entregue' && rndMsg() < 0.6) continue;
       const modelo = modelos.find((m) => m.chave === chave)!;
       const valores = valoresDoContexto({ nome: c.nome, config: configuracao, processo: { ...det, estado: h.estado! }, comValores: true });
@@ -582,6 +609,11 @@ export function criarSeed(): MockDB {
     }
   }
   mensagens.sort((a, b) => a.data.localeCompare(b.data)).forEach((m, i) => { m.id = `msg${i + 1}`; });
+  // A mensagem "pronta" é o aviso que faz contar o prazo para levantar.
+  for (const p of processos.filter((x) => x.estado === 'pronta_entrega')) {
+    const aviso = mensagens.find((m) => m.processoId === p.id && m.modelo === 'pronta');
+    if (aviso && (aviso.canal === 'whatsapp' || aviso.canal === 'email')) p.avisoLevantamento = { data: aviso.data, canal: aviso.canal, porId: aviso.autorId };
+  }
   // Quem recebeu o link costuma abri-lo pouco depois.
   for (const m of mensagens) {
     const p = processos.find((x) => x.id === m.processoId);
@@ -628,9 +660,10 @@ export function criarSeed(): MockDB {
   // ---------- Pedidos feitos no site público ----------
   const horasAtras = (h: number) => new Date(agora - h * 3600000).toISOString();
   const pedidos: PedidoServico[] = [
-    { id: 'ps3', data: horasAtras(2), nome: 'Wilson Domingos', telefone: '+244 923 410 552', modelo: 'L200 / Triton', servico: 'Tração 4x4', mensagem: 'A tração às quatro rodas não engata em andamento.', estado: 'novo' },
-    { id: 'ps2', data: horasAtras(26), nome: 'Marta Kissanga', telefone: '+244 912 337 801', email: 'marta.k@email.com', modelo: 'Pajero Sport', servico: 'Revisões e manutenção', dataPreferida: new Date(agora + 3 * 86400000).toISOString().slice(0, 10), estado: 'contactado', tratadoPorId: 'u1', tratadoEm: horasAtras(24), notas: 'Liga na segunda para confirmar a hora.' },
-    { id: 'ps1', data: horasAtras(80), nome: 'Alberto Cachimbo', telefone: '+244 931 902 114', modelo: 'Pajero', servico: 'Diagnóstico eletrónico', estado: 'arquivado', tratadoPorId: 'u1', tratadoEm: horasAtras(70), notas: 'Resolveu noutra oficina.' },
+    { id: 'ps4', data: horasAtras(5), nome: 'Joana Bento', telefone: '+244 934 220 618', modelo: 'Toyota Hilux', servico: 'Travões e suspensão', mensagem: 'Chia ao travar e puxa para a direita.', estado: 'novo' },
+    { id: 'ps3', data: horasAtras(2), nome: 'Wilson Domingos', telefone: '+244 923 410 552', modelo: 'Mitsubishi L200 / Triton', servico: 'Tração 4x4', mensagem: 'A tração às quatro rodas não engata em andamento.', estado: 'novo' },
+    { id: 'ps2', data: horasAtras(26), nome: 'Marta Kissanga', telefone: '+244 912 337 801', email: 'marta.k@email.com', modelo: 'Mitsubishi Pajero Sport', servico: 'Revisões e manutenção', dataPreferida: new Date(agora + 3 * 86400000).toISOString().slice(0, 10), estado: 'contactado', tratadoPorId: 'u1', tratadoEm: horasAtras(24), notas: 'Liga na segunda para confirmar a hora.' },
+    { id: 'ps1', data: horasAtras(80), nome: 'Alberto Cachimbo', telefone: '+244 931 902 114', modelo: 'Mitsubishi Pajero', servico: 'Diagnóstico eletrónico', estado: 'arquivado', tratadoPorId: 'u1', tratadoEm: horasAtras(70), notas: 'Resolveu noutra oficina.' },
   ];
 
   // ---------- Stock: inventário inicial e encomendas ----------

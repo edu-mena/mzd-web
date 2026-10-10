@@ -1,4 +1,4 @@
-import type { Fatura, Orcamento, Processo } from '../types';
+import type { CondicoesComerciais, Fatura, Orcamento, Processo } from '../types';
 
 // Regra única de cálculo de valores. Todo o sistema (documentos, listas, painéis)
 // deve usar estas funções, para que os totais coincidam em todo o lado.
@@ -35,6 +35,43 @@ export function totalFaturavel(p: Pick<Processo, 'orcamento' | 'orcamentosAdicio
     .filter((a) => a.estado === 'aprovado')
     .reduce((s, a) => s + calcularTotais(a).total, 0);
   return arredondar(calcularTotais(p.orcamento).total + adicionais);
+}
+
+/**
+ * Valor a pagar na aceitação do orçamento: a % das peças e a % da mão de obra das condições,
+ * com o desconto e o IVA aplicados na mesma proporção. Arredondado ao kwanza.
+ */
+export function valorAceitacao(o?: Pick<Orcamento, 'pecas' | 'maoObra' | 'taxaIva' | 'desconto' | 'condicoes'>): number {
+  if (!o) return 0;
+  const t = calcularTotais(o);
+  const bruto = t.pecas + t.maoObra;
+  if (bruto === 0) return 0;
+  const parte = (t.pecas * o.condicoes.pecasAceitacaoPct + t.maoObra * o.condicoes.maoObraAceitacaoPct) / 100;
+  return Math.min(t.total, Math.round(parte * (t.subtotal / bruto) * (1 + o.taxaIva / 100)));
+}
+
+/** Condições de pagamento em texto corrido (pró-forma, portal e mensagens). */
+export function textoCondicoes(c: CondicoesComerciais): string {
+  const partes = (pecas: number, maoObra: number) =>
+    [pecas > 0 && `${pecas}% das peças`, maoObra > 0 && `${maoObra}% da mão de obra`].filter(Boolean).join(' e ');
+  const aceitacao = partes(c.pecasAceitacaoPct, c.maoObraAceitacaoPct);
+  const levantamento = partes(100 - c.pecasAceitacaoPct, 100 - c.maoObraAceitacaoPct);
+  if (!aceitacao) return 'Pagamento total no levantamento da viatura.';
+  return `Na aceitação do orçamento: ${aceitacao}.${levantamento ? ` No levantamento da viatura: ${levantamento}.` : ''}`;
+}
+
+/**
+ * Quanto falta receber do pagamento da aceitação (0 = a reparação pode começar).
+ * Só conta depois de o cliente aceitar e deixa de contar se a Direção o dispensar.
+ */
+export function faltaPagamentoAceitacao(p: Pick<Processo, 'orcamento' | 'autorizacao' | 'adiantamentos' | 'fatura' | 'dispensaPagamentoAceitacao'>): number {
+  if (!p.autorizacao || p.dispensaPagamentoAceitacao) return 0;
+  return Math.max(0, arredondar(valorAceitacao(p.orcamento) - recebidoProcesso(p)));
+}
+
+/** Todas as faturas do processo: a do serviço e as de parqueamento. */
+export function faturasDe(p: Pick<Processo, 'fatura' | 'faturasParqueamento'>): Fatura[] {
+  return [...(p.fatura ? [p.fatura] : []), ...(p.faturasParqueamento ?? [])];
 }
 
 /** Valor já recebido de um processo: pagamentos da fatura ou, antes dela, adiantamentos. */

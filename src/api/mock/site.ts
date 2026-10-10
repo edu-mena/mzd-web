@@ -35,6 +35,7 @@ function validarConteudo(b: any): ConteudoSite {
   return {
     hero: { titulo: texto(b?.hero?.titulo, 'Título principal', 5, 80), subtitulo: texto(b?.hero?.subtitulo, 'Subtítulo', 10, 300), imagem: imagem(b?.hero?.imagem, 'Imagem principal') },
     destaques: lista(b?.destaques, 'Destaques', 4, (x) => ({ titulo: texto(x?.titulo, 'Destaque', 3, 50), texto: texto(x?.texto, 'Texto do destaque', 5, 200) })),
+    marcas: [...new Set(lista(b?.marcas ?? [], 'Marcas', 40, (x) => texto(x, 'Marca', 2, 30)))],
     modelos: lista(b?.modelos, 'Modelos', 12, (x, i) => ({ id: ident(x, i), nome: texto(x?.nome, 'Modelo', 2, 40), descricao: texto(x?.descricao, `Descrição de ${x?.nome ?? 'modelo'}`, 5, 240), imagem: imagem(x?.imagem, `Modelo ${x?.nome ?? i + 1}`) })),
     servicos: lista(b?.servicos, 'Serviços', 12, (x, i) => ({ id: ident(x, i), titulo: texto(x?.titulo, 'Serviço', 3, 50), descricao: texto(x?.descricao, `Descrição de ${x?.titulo ?? 'serviço'}`, 5, 240), imagem: imagem(x?.imagem, `Serviço ${x?.titulo ?? i + 1}`) })),
     galeria: lista(b?.galeria, 'Galeria', 24, (x, i) => ({ id: ident(x, i), ...imagem(x, `Galeria ${i + 1}`) })),

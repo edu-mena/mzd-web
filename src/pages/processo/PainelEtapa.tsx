@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Check, ChevronRight, ClipboardCheck, FileText, MessageCircle, Stethoscope, Wallet, KeyRound, Lock } from 'lucide-react';
+import { Check, ChevronRight, ClipboardCheck, FileText, MessageCircle, Stethoscope, Wallet, KeyRound, Lock, Upload } from 'lucide-react';
 import clsx from 'clsx';
 import { useAcaoProcesso, useAlterarFinanceiro, useUtilizadores } from '../../api/hooks';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/useAuth';
 import { PERMISSAO_ETAPA, PERMISSOES_POR_PERFIL } from '../../auth/permissions';
-import type { ProcessoDetalhado } from '../../types';
+import type { ChaveModelo, ProcessoDetalhado } from '../../types';
 import { ESTADO_LABEL, ESTADOS_ORDEM, PERFIL_LABEL, SISTEMAS_VEICULO } from '../../types';
 import { Card } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -15,9 +15,10 @@ import { Field, Select, Textarea } from '../../components/ui/Form';
 import Modal from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/toast-context';
 import { mensagemErro } from '../../lib/erros';
-import { calcularTotais, emDivida, recebidoProcesso, totalFaturavel } from '../../lib/calculos';
-import { formatDateTime } from '../../lib/format';
-import { haQuanto } from '../../lib/datas';
+import { calcularTotais, emDivida, faltaPagamentoAceitacao, recebidoProcesso, saldoEmAberto, totalFaturavel, valorAceitacao } from '../../lib/calculos';
+import { aceitarAte, parqueamentoPorFaturar, textoAvisoLevantamento, valorParqueamento } from '../../lib/parqueamento';
+import { diaISO } from '../../lib/datas';
+import { formatDateTime, formatDia } from '../../lib/format';
 import { modeloDaEtapa } from '../../lib/mensagens';
 import ComporMensagem from '../../components/comunicacoes/ComporMensagem';
 import FormDiagnostico from './FormDiagnostico';
@@ -26,17 +27,24 @@ import { FormAprovacao } from './FormAprovacao';
 import FormQualidade from './FormQualidade';
 import { FormEntrega, FormPagamento } from './FormPagamentoEntrega';
 import Reparacao from './Reparacao';
+import FormFichaEntrada from './FormFichaEntrada';
+import { BlocoAvisoLevantamento, BlocoPagamentoAceitacao, BlocoParqueamento, ComoAceitar } from './Cobranca';
+import { LinkImprimir } from '../../documents/FichaRecepcaoDoc';
 
-type Aberto = 'diagnostico' | 'orcamento' | 'aprovacao' | 'qualidade' | 'pagamento' | 'entrega' | 'mensagem' | null;
+type Aberto =
+  | { tipo: 'diagnostico' | 'orcamento' | 'aprovacao' | 'qualidade' | 'entrega' | 'ficha' }
+  | { tipo: 'pagamento'; fatura?: string }
+  | { tipo: 'mensagem'; modelo?: ChaveModelo }
+  | null;
 
 const DESCRICAO: Partial<Record<ProcessoDetalhado['estado'], string>> = {
-  recepcao: 'Atribua o mecânico responsável e inicie o diagnóstico.',
+  recepcao: 'O mecânico verifica a viatura com o cliente na ficha de entrada em papel. Carregue a ficha assinada e atribua o mecânico.',
   diagnostico: 'O mecânico inspeciona cada sistema e regista o que encontrou, com fotografias.',
   orcamentacao: 'Orçamente as peças e a mão de obra a partir do diagnóstico e envie ao cliente.',
-  aguarda_aprovacao: 'O cliente decide sobre o diagnóstico e o orçamento. Registe a decisão assim que a tiver.',
-  em_reparacao: 'Execute as tarefas aprovadas. Registe o tempo e qualquer trabalho adicional encontrado.',
+  aguarda_aprovacao: 'O cliente aceita (ou recusa) o diagnóstico e o orçamento. Se aceitar online, o processo avança sozinho.',
+  em_reparacao: 'Com o pagamento da aceitação recebido, execute as tarefas aprovadas. Registe o tempo e qualquer trabalho adicional encontrado.',
   controlo_qualidade: 'Verifique o trabalho e os itens de segurança antes de a viatura ficar pronta.',
-  pronta_entrega: 'Receba o pagamento em falta e entregue a viatura com a assinatura do cliente.',
+  pronta_entrega: 'Avise o cliente, receba o que falta (e o parqueamento, se houver) e entregue a viatura com a assinatura do cliente.',
 };
 
 /** Painel "Próximo passo": o que falta na etapa atual, quem pode agir e as ações disponíveis. */
@@ -51,7 +59,7 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
   const p = processo;
   const verValores = can('valores.ver');
 
-  if (p.estado === 'cancelado') return null;
+  if (p.estado === 'cancelado') return <Cancelado processo={p} />;
   if (p.estado === 'entregue') return <Entregue processo={p} />;
 
   const perm = PERMISSAO_ETAPA[p.estado];
@@ -79,27 +87,47 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
   }
 
   const mecanicoBloqueado = user?.perfil === 'mecanico' && p.mecanicoId !== user.id;
+  const abrir = (tipo: 'diagnostico' | 'orcamento' | 'aprovacao' | 'qualidade' | 'entrega' | 'ficha') => setAberto({ tipo });
+  const pagar = (fatura?: string) => setAberto({ tipo: 'pagamento', fatura });
+  const mensagem = (modelo?: ChaveModelo) => setAberto({ tipo: 'mensagem', modelo });
   const zap = can('mensagens.enviar') && p.cliente.consentimentoMensagens
-    ? <Button variante="secundario" icone={<MessageCircle size={15} />} onClick={() => setAberto('mensagem')}>Avisar o cliente</Button>
+    ? <Button variante="secundario" icone={<MessageCircle size={15} />} onClick={() => mensagem()}>Avisar o cliente</Button>
     : null;
+  const parqueamento = <BlocoParqueamento processo={p} onPagar={pagar} />;
+  // Parqueamento por faturar ou faturas de parqueamento por pagar (impedem a entrega).
+  const parqueamentoPendente = parqueamentoPorFaturar(p).length > 0 || (p.faturasParqueamento ?? []).some((f) => saldoEmAberto(f) > 0);
 
   let requisitos: { ok: boolean; texto: ReactNode }[] = [];
   let acoes: ReactNode = null;
   let corpo: ReactNode = null;
 
   switch (p.estado) {
-    case 'recepcao':
+    case 'recepcao': {
+      const f = p.fichaRecepcao;
       requisitos = [
-        { ok: !!p.fichaRecepcao.assinaturaCliente, texto: 'Ficha de receção assinada pelo cliente' },
+        { ok: f.assinaturaCliente, texto: f.assinaturaCliente ? `Ficha de entrada assinada${f.km !== undefined ? ` · ${f.km.toLocaleString('pt-PT')} km` : ''}` : 'Ficha de entrada assinada pelo cliente e digitalizada' },
         { ok: !!p.mecanicoId, texto: p.mecanico ? `Mecânico atribuído: ${p.mecanico.nome}` : 'Mecânico atribuído' },
       ];
-      corpo = can('processos.atribuir') && <AtribuirMecanico processo={p} />;
-      acoes = can('processos.atribuir') && (
-        <Button onClick={() => avancar('Diagnóstico iniciado')} carregando={acao.isPending} disabled={!p.mecanicoId}>
-          Iniciar diagnóstico <ChevronRight size={15} />
-        </Button>
+      corpo = (
+        <>
+          {!f.assinaturaCliente && can('processos.criar') && <PassosFicha processo={p} onCarregar={() => abrir('ficha')} />}
+          {can('processos.atribuir') && <AtribuirMecanico processo={p} />}
+        </>
+      );
+      acoes = (
+        <>
+          {f.assinaturaCliente && can('processos.criar') && !!f.digitalizacaoIds?.length && (
+            <Button variante="fantasma" icone={<Upload size={15} />} onClick={() => abrir('ficha')}>Substituir ficha</Button>
+          )}
+          {can('processos.atribuir') && (
+            <Button onClick={() => avancar('Diagnóstico iniciado')} carregando={acao.isPending} disabled={!p.mecanicoId || !f.assinaturaCliente}>
+              Iniciar diagnóstico <ChevronRight size={15} />
+            </Button>
+          )}
+        </>
       );
       break;
+    }
     case 'diagnostico': {
       const avaliados = p.diagnostico?.itens.length ?? 0;
       requisitos = [
@@ -110,7 +138,7 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
       acoes = can('diagnostico.editar') && (
         mecanicoBloqueado
           ? <p className="text-xs text-mzd-gray">Atribuído a {p.mecanico?.nome}.</p>
-          : <Button icone={<Stethoscope size={15} />} onClick={() => setAberto('diagnostico')}>{avaliados ? 'Continuar diagnóstico' : 'Fazer diagnóstico'}</Button>
+          : <Button icone={<Stethoscope size={15} />} onClick={() => abrir('diagnostico')}>{avaliados ? 'Continuar diagnóstico' : 'Fazer diagnóstico'}</Button>
       );
       break;
     }
@@ -139,41 +167,53 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
       );
       acoes = can('orcamento.editar') && verValores && (
         <>
-          <Button variante={linhas ? 'secundario' : 'primario'} icone={<FileText size={15} />} onClick={() => setAberto('orcamento')}>{linhas ? 'Editar orçamento' : 'Fazer orçamento'}</Button>
+          <Button variante={linhas ? 'secundario' : 'primario'} icone={<FileText size={15} />} onClick={() => abrir('orcamento')}>{linhas ? 'Editar orçamento' : 'Fazer orçamento'}</Button>
           {linhas > 0 && <Button onClick={() => avancar('Orçamento enviado — aguarda aprovação do cliente')} carregando={acao.isPending} disabled={descontoBloqueia}>Enviar ao cliente <ChevronRight size={15} /></Button>}
         </>
       );
       break;
     }
-    case 'aguarda_aprovacao':
+    case 'aguarda_aprovacao': {
+      const ate = aceitarAte(p.orcamento);
+      const expirou = !!ate && diaISO(new Date()) > ate;
       requisitos = [
-        { ok: true, texto: <>Enviado ao cliente {p.orcamento?.enviadoEm && formatDateTime(p.orcamento.enviadoEm)}{verValores && <> · <Kz valor={calcularTotais(p.orcamento).total} /> com IVA</>}</> },
+        { ok: true, texto: <>Enviado ao cliente {p.orcamento?.enviadoEm && formatDateTime(p.orcamento.enviadoEm)}{verValores && <> · <Kz valor={calcularTotais(p.orcamento).total} />{p.orcamento?.isencaoIva ? ' sem IVA' : ' com IVA'}</>}</> },
+        ...(ate ? [{ ok: !expirou, texto: expirou ? `Validade terminou a ${formatDia(ate)} — parqueamento a contar` : `Aceitar até ${formatDia(ate)}` }] : []),
         { ok: false, texto: 'Decisão do cliente' },
       ];
-      if (p.portal) {
-        requisitos.splice(1, 0, {
-          ok: !!p.portal.ultimoAcesso,
-          texto: p.portal.ultimoAcesso ? `Cliente abriu o link ${haQuanto(p.portal.ultimoAcesso, agora)} — pode aprovar lá` : 'O cliente ainda não abriu o link do orçamento',
-        });
-      }
-      acoes = (
+      corpo = (
         <>
-          {zap}
-          {can('aprovacao.registar') && <Button icone={<ClipboardCheck size={15} />} onClick={() => setAberto('aprovacao')}>Registar decisão do cliente</Button>}
+          <ComoAceitar processo={p} agora={agora} onMensagem={mensagem} onRegistar={() => abrir('aprovacao')} />
+          {parqueamento}
         </>
       );
+      acoes = can('aprovacao.registar') && <Button icone={<ClipboardCheck size={15} />} onClick={() => abrir('aprovacao')}>Registar decisão do cliente</Button>;
       break;
+    }
     case 'em_reparacao': {
       const pendentes = (p.tarefas ?? []).filter((t) => !t.feita).length;
+      const falta = faltaPagamentoAceitacao(p);
       requisitos = [
+        {
+          ok: !p.aguardaPagamento,
+          texto: p.aguardaPagamento
+            ? verValores ? <>Pagamento da aceitação: faltam <Kz valor={falta} /></> : 'Pagamento da aceitação em falta'
+            : p.dispensaPagamentoAceitacao ? 'Começou sem o pagamento da aceitação (Direção)' : verValores ? <>Pagamento da aceitação recebido · <Kz valor={valorAceitacao(p.orcamento)} /></> : 'Pagamento da aceitação recebido',
+        },
         { ok: pendentes === 0, texto: pendentes ? `${pendentes} tarefa(s) por fazer` : 'Todas as tarefas feitas' },
         { ok: !p.aguardaPecas, texto: p.aguardaPecas ? 'À espera de peças' : 'Sem peças em falta' },
         { ok: !(p.registosTempo ?? []).some((r) => !r.fim), texto: 'Cronómetros parados' },
       ];
-      corpo = <Reparacao processo={p} />;
+      corpo = (
+        <>
+          <BlocoPagamentoAceitacao processo={p} onPagar={() => pagar()} onMensagem={mensagem} />
+          {parqueamento}
+          <Reparacao processo={p} />
+        </>
+      );
       acoes = (
         <>
-          {can('pagamentos.registar') && emDivida(p) > 0 && <Button variante="secundario" icone={<Wallet size={15} />} onClick={() => setAberto('pagamento')}>Adiantamento</Button>}
+          {can('pagamentos.registar') && !p.aguardaPagamento && emDivida(p) > 0 && <Button variante="secundario" icone={<Wallet size={15} />} onClick={() => pagar()}>Registar pagamento</Button>}
           {can('reparacao.executar') && !mecanicoBloqueado && (
             <Button onClick={() => avancar('Reparação concluída — segue para controlo de qualidade')} carregando={acao.isPending} disabled={requisitos.some((r) => !r.ok)}>
               Concluir reparação <ChevronRight size={15} />
@@ -186,19 +226,35 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
     case 'controlo_qualidade':
       requisitos = [{ ok: false, texto: 'Checklist de qualidade por fazer' }];
       if (p.retrabalhos) requisitos.push({ ok: false, texto: `Já reprovado ${p.retrabalhos} vez(es)` });
-      acoes = can('qualidade.validar') && <Button icone={<ClipboardCheck size={15} />} onClick={() => setAberto('qualidade')}>Fazer controlo de qualidade</Button>;
+      corpo = parqueamento;
+      acoes = can('qualidade.validar') && <Button icone={<ClipboardCheck size={15} />} onClick={() => abrir('qualidade')}>Fazer controlo de qualidade</Button>;
       break;
     case 'pronta_entrega': {
       const divida = emDivida(p);
+      const aviso = textoAvisoLevantamento(p);
+      const v = valorParqueamento(parqueamentoPorFaturar(p), p.orcamento);
       requisitos = [
         { ok: true, texto: <>Fatura {p.fatura?.numero} emitida{verValores && <> · <Kz valor={totalFaturavel(p)} /></>}</> },
-        { ok: divida === 0, texto: divida === 0 ? 'Pago na totalidade' : verValores ? <>Falta receber <Kz valor={divida} /> (recebido <Kz valor={recebidoProcesso(p)} />)</> : 'Pagamento por concluir' },
+        { ok: !!aviso, texto: aviso ?? 'Cliente avisado de que a viatura está pronta' },
+        { ok: divida === 0, texto: divida === 0 ? 'Fatura do serviço paga' : verValores ? <>Falta receber <Kz valor={divida} /> (recebido <Kz valor={recebidoProcesso(p)} />)</> : 'Pagamento por concluir' },
       ];
+      if (parqueamentoPendente || p.faturasParqueamento?.length) {
+        requisitos.push({
+          ok: !parqueamentoPendente,
+          texto: !parqueamentoPendente ? 'Parqueamento pago' : v.dias ? `Parqueamento: ${v.dias} dia(s) por faturar` : 'Fatura de parqueamento por pagar',
+        });
+      }
+      corpo = (
+        <>
+          <BlocoAvisoLevantamento processo={p} onMensagem={mensagem} />
+          {parqueamento}
+        </>
+      );
       acoes = (
         <>
-          {zap}
-          {can('pagamentos.registar') && divida > 0 && <Button variante="secundario" icone={<Wallet size={15} />} onClick={() => setAberto('pagamento')}>Registar pagamento</Button>}
-          {can('entrega.registar') && <Button icone={<KeyRound size={15} />} onClick={() => setAberto('entrega')} disabled={divida > 0}>Entregar viatura</Button>}
+          {p.avisoLevantamento && zap}
+          {can('pagamentos.registar') && divida > 0 && <Button variante="secundario" icone={<Wallet size={15} />} onClick={() => pagar(p.fatura?.numero)}>Registar pagamento</Button>}
+          {can('entrega.registar') && <Button icone={<KeyRound size={15} />} onClick={() => abrir('entrega')} disabled={divida > 0 || parqueamentoPendente}>Entregar viatura</Button>}
         </>
       );
       break;
@@ -235,13 +291,7 @@ export default function PainelEtapa({ processo }: { processo: ProcessoDetalhado 
         </div>
       </div>
 
-      {aberto === 'diagnostico' && <FormDiagnostico processo={p} onFechar={() => setAberto(null)} />}
-      {aberto === 'orcamento' && <FormOrcamento processo={p} onFechar={() => setAberto(null)} />}
-      {aberto === 'aprovacao' && <FormAprovacao processo={p} onFechar={() => setAberto(null)} />}
-      {aberto === 'qualidade' && <FormQualidade processo={p} onFechar={() => setAberto(null)} />}
-      {aberto === 'pagamento' && <FormPagamento processo={p} onFechar={() => setAberto(null)} />}
-      {aberto === 'entrega' && <FormEntrega processo={p} onFechar={() => setAberto(null)} />}
-      {aberto === 'mensagem' && <ComporMensagem alvo={{ processoId: p.id }} modeloInicial={modeloDaEtapa(p)} onFechar={() => setAberto(null)} />}
+      <Janelas processo={p} aberto={aberto} onFechar={() => setAberto(null)} />
       {motivoRecusa !== null && (
         <Modal
           open
@@ -289,6 +339,59 @@ function AtribuirMecanico({ processo }: { processo: ProcessoDetalhado }) {
         </Select>
       </label>
     </div>
+  );
+}
+
+/** Formulários abertos a partir do painel (também no processo cancelado, para o parqueamento). */
+function Janelas({ processo: p, aberto, onFechar }: { processo: ProcessoDetalhado; aberto: Aberto; onFechar: () => void }) {
+  if (!aberto) return null;
+  switch (aberto.tipo) {
+    case 'diagnostico': return <FormDiagnostico processo={p} onFechar={onFechar} />;
+    case 'orcamento': return <FormOrcamento processo={p} onFechar={onFechar} />;
+    case 'aprovacao': return <FormAprovacao processo={p} onFechar={onFechar} />;
+    case 'qualidade': return <FormQualidade processo={p} onFechar={onFechar} />;
+    case 'pagamento': return <FormPagamento processo={p} fatura={aberto.fatura} onFechar={onFechar} />;
+    case 'entrega': return <FormEntrega processo={p} onFechar={onFechar} />;
+    case 'ficha': return <FormFichaEntrada processo={p} onFechar={onFechar} />;
+    case 'mensagem': return <ComporMensagem alvo={{ processoId: p.id }} modeloInicial={aberto.modelo ?? modeloDaEtapa(p)} onFechar={onFechar} />;
+  }
+}
+
+function Passo({ n, titulo, texto, acao }: { n: number; titulo: string; texto: string; acao?: ReactNode }) {
+  return (
+    <li className="flex flex-wrap items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+      <span className="num flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-[1.5px] border-mzd-black text-[11px] font-bold">{n}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-semibold text-mzd-black">{titulo}</span>
+        <span className="block text-[12.5px] text-mzd-gray">{texto}</span>
+      </span>
+      {acao}
+    </li>
+  );
+}
+
+/** Receção: a ficha em papel vai ao mecânico e volta assinada para ser digitalizada. */
+function PassosFicha({ processo, onCarregar }: { processo: ProcessoDetalhado; onCarregar: () => void }) {
+  return (
+    <ol className="divide-y divide-linha/70 rounded-md border border-linha bg-white p-4">
+      <Passo n={1} titulo="Imprimir a ficha de entrada" texto="Já vem com os dados do cliente, da viatura e a queixa." acao={<LinkImprimir processoId={processo.id} documento="ficha">Imprimir ficha</LinkImprimir>} />
+      <Passo n={2} titulo="O mecânico preenche-a com o cliente" texto="Quilómetros, combustível, danos, pertences — e o cliente assina." />
+      <Passo n={3} titulo="Digitalizar e carregar a ficha assinada" texto="Uma fotografia de cada página (ou o PDF) e os quilómetros." acao={<Button tamanho="sm" icone={<Upload size={14} />} onClick={onCarregar}>Carregar ficha assinada</Button>} />
+    </ol>
+  );
+}
+
+/** Processo cancelado com a viatura ainda a dever parqueamento (ex.: orçamento recusado depois da validade). */
+function Cancelado({ processo }: { processo: ProcessoDetalhado }) {
+  const { can } = useAuth();
+  const [aberto, setAberto] = useState<Aberto>(null);
+  const pendente = parqueamentoPorFaturar(processo).length > 0 || (processo.faturasParqueamento ?? []).some((f) => saldoEmAberto(f) > 0);
+  if (!pendente || !can('valores.ver')) return null;
+  return (
+    <Card className="no-print p-5">
+      <BlocoParqueamento processo={processo} onPagar={(fatura) => setAberto({ tipo: 'pagamento', fatura })} />
+      <Janelas processo={processo} aberto={aberto} onFechar={() => setAberto(null)} />
+    </Card>
   );
 }
 

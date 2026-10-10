@@ -2,13 +2,16 @@ import type { ProcessoDetalhado } from '../types';
 import { METODO_APROVACAO_LABEL } from '../types';
 import DocumentShell, { Field, SectionTitle, SignatureLine } from './DocumentShell';
 import { formatAOA, formatDate, formatDateTime } from '../lib/format';
-import { calcularTotais } from '../lib/calculos';
+import { calcularTotais, faltaPagamentoAceitacao, textoCondicoes, valorAceitacao } from '../lib/calculos';
 
 export default function AutorizacaoDoc({ processo }: { processo: ProcessoDetalhado }) {
   const a = processo.autorizacao;
   const { cliente, viatura } = processo;
   const total = a?.valorTotal ?? calcularTotais(processo.orcamento).total;
   const adicionais = (processo.orcamentosAdicionais ?? []).filter((x) => x.decisao);
+  const o = processo.orcamento;
+  const aceitacao = valorAceitacao(o);
+  const falta = faltaPagamentoAceitacao(processo);
 
   return (
     <DocumentShell title="Declaração de Autorização de Reparação" numero={processo.numero}>
@@ -22,8 +25,9 @@ export default function AutorizacaoDoc({ processo }: { processo: ProcessoDetalha
       <p className="mb-5 rounded-lg bg-zinc-50 p-4 text-sm leading-relaxed">
         Eu, <strong>{a?.autorizadoPor ?? '______________________________'}</strong>, na qualidade de proprietário/responsável pela viatura com matrícula{' '}
         <strong>{viatura.matricula}</strong>, declaro ter tomado conhecimento do diagnóstico e do orçamento apresentados pela MZD Carros e Motores,
-        no valor total de <strong>{formatAOA(total)}</strong> (IVA incluído), e <strong>autorizo</strong> a requisição das peças necessárias
-        e o início da reparação conforme os termos acordados. Qualquer trabalho adicional será sujeito a nova aprovação.
+        no valor total de <strong>{formatAOA(total)}</strong> ({o?.isencaoIva ? 'sem IVA' : 'IVA incluído'}), aceito as condições de pagamento
+        {o && <> — {textoCondicoes(o.condicoes)}</>} — e os prazos indicados na pró-forma, e <strong>autorizo</strong> a requisição das peças
+        necessárias e o início da reparação depois do pagamento da aceitação. Qualquer trabalho adicional será sujeito a nova aceitação.
       </p>
 
       <SectionTitle>Validação da Autorização</SectionTitle>
@@ -31,10 +35,15 @@ export default function AutorizacaoDoc({ processo }: { processo: ProcessoDetalha
         <Field label="Método" value={a ? METODO_APROVACAO_LABEL[a.metodo] : 'Pendente'} />
         <Field label="Data/hora" value={a ? formatDateTime(a.data) : '—'} />
         <Field label="Autorizado por" value={a?.autorizadoPor ?? '—'} />
+        <Field label="Pagamento da aceitação" value={formatAOA(aceitacao)} />
+        <Field
+          label="Situação do pagamento"
+          value={!a ? '—' : processo.dispensaPagamentoAceitacao ? 'Dispensado pela Direção' : falta > 0 ? `Faltam ${formatAOA(falta)}` : 'Recebido'}
+        />
       </div>
       {a?.comprovativoAnexoId && (
         <p className="mb-5 rounded-lg border border-zinc-200 p-3 text-xs text-mzd-gray">
-          Comprovativo da aprovação ({METODO_APROVACAO_LABEL[a.metodo].toLowerCase()}) guardado no processo, separador Fotos.
+          {a.metodo === 'presencial' ? 'Pró-forma assinada pelo cliente' : `Comprovativo da aprovação (${METODO_APROVACAO_LABEL[a.metodo].toLowerCase()})`} guardado no processo, separador Fotos.
         </p>
       )}
 
@@ -64,7 +73,7 @@ export default function AutorizacaoDoc({ processo }: { processo: ProcessoDetalha
         </>
       )}
 
-      <SignatureLine label="Assinatura do cliente (quando presencial)" processoId={processo.id} anexoId={a?.assinaturaAnexoId} />
+      {(!a || a.assinaturaAnexoId) && <SignatureLine label="Assinatura do cliente" processoId={processo.id} anexoId={a?.assinaturaAnexoId} />}
     </DocumentShell>
   );
 }

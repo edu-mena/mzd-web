@@ -62,8 +62,8 @@ export default function RelatorioServicosDoc({ processo }: { processo: ProcessoD
       <div className="mb-5 grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-zinc-200 p-3">
           <p className="mb-1 text-[10px] font-bold uppercase text-mzd-gray">Na receção</p>
-          <Field label="Quilometragem" value={`${processo.fichaRecepcao.km.toLocaleString('pt-PT')} km`} />
-          <Field label="Combustível" value={`${processo.fichaRecepcao.combustivel}%`} className="mt-2" />
+          <Field label="Quilometragem" value={processo.fichaRecepcao.km !== undefined ? `${processo.fichaRecepcao.km.toLocaleString('pt-PT')} km` : '—'} />
+          <Field label="Combustível" value={processo.fichaRecepcao.combustivel !== undefined ? `${processo.fichaRecepcao.combustivel}%` : '—'} className="mt-2" />
         </div>
         <div className="rounded-lg border border-zinc-200 p-3">
           <p className="mb-1 text-[10px] font-bold uppercase text-mzd-gray">Na entrega</p>

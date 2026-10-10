@@ -12,7 +12,7 @@ import Matricula from '../components/ui/Matricula';
 import Kz from '../components/ui/Kz';
 import { Carregando, ErroCarregamento, Vazio } from '../components/ui/Estados';
 import { formatDate, formatAOA } from '../lib/format';
-import { calcularTotais, saldoEmAberto } from '../lib/calculos';
+import { calcularTotais, faturasDe, saldoEmAberto } from '../lib/calculos';
 import { estaAtivo } from '../types';
 import Button from '../components/ui/Button';
 import ComporMensagem from '../components/comunicacoes/ComporMensagem';
@@ -37,8 +37,8 @@ export default function ClienteDetail() {
 
   const verValores = can('valores.ver');
   const processosOrdenados = [...processosCliente].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm));
-  const faturado = processosCliente.reduce((s, p) => s + (p.fatura?.valorTotal ?? 0), 0);
-  const emAberto = processosCliente.reduce((s, p) => s + saldoEmAberto(p.fatura), 0);
+  const faturado = processosCliente.flatMap(faturasDe).reduce((s, f) => s + f.valorTotal, 0);
+  const emAberto = processosCliente.flatMap(faturasDe).reduce((s, f) => s + saldoEmAberto(f), 0);
   const ultima = processosOrdenados[0];
 
   return (

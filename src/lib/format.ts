@@ -22,3 +22,8 @@ export type FormatoIndicador = 'kz' | 'n' | 'pct' | 'dias';
 
 export const formatarIndicador = (v: number, f: FormatoIndicador) =>
   f === 'kz' ? formatAOA(v) : f === 'pct' ? `${v.toLocaleString('pt-PT')}%` : f === 'dias' ? `${v.toLocaleString('pt-PT')} dias` : v.toLocaleString('pt-PT');
+
+/** Dia "AAAA-MM-DD" (sem hora) → "dd/mm/aaaa". */
+export function formatDia(dia: string): string {
+  return formatDate(`${dia}T12:00:00`);
+}

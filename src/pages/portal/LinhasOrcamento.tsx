@@ -37,7 +37,7 @@ export default function LinhasOrcamento({ orcamento: o }: { orcamento: LinhasPor
           <div className="flex justify-between text-sinal-verde"><dt>Desconto ({o.descontoPct}%)</dt><dd className="num">−{formatAOA(t.desconto)}</dd></div>
         )}
         <div className="flex justify-between text-mzd-gray"><dt>Subtotal</dt><dd className="num">{formatAOA(t.subtotal)}</dd></div>
-        <div className="flex justify-between text-mzd-gray"><dt>IVA ({o.taxaIva}%)</dt><dd className="num">{formatAOA(t.iva)}</dd></div>
+        <div className="flex justify-between text-mzd-gray"><dt>{o.isencaoIva ? 'IVA (isento)' : `IVA (${o.taxaIva}%)`}</dt><dd className="num">{formatAOA(t.iva)}</dd></div>
         <div className="flex items-baseline justify-between pt-1">
           <dt className="font-display text-[15px] font-extrabold text-mzd-black">Total</dt>
           <dd className="font-display text-xl font-extrabold text-mzd-black">{formatAOA(t.total)}</dd>

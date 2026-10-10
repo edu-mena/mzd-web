@@ -13,22 +13,28 @@ export interface FicheiroPendente {
   id: string;
   ficheiro: Blob;
   nome: string;
-  tipo: 'foto' | 'video';
+  /** "documento" = PDF de um digitalizador. */
+  tipo: 'foto' | 'video' | 'documento';
   previsualizacao: string;
 }
 
+export const LIMITE_PDF_MB = 10;
+
 /**
  * Botão para tirar/escolher fotos e vídeos. Em telemóvel abre a câmara traseira.
- * As fotos são comprimidas antes de serem devolvidas.
+ * As fotos são comprimidas antes de serem devolvidas. Com `aceitarPdf` (documentos digitalizados),
+ * aceita também PDF e deixa escolher entre a câmara e os ficheiros.
  */
 export function SeletorFicheiros({
   onEscolher,
   aceitarVideo = true,
+  aceitarPdf = false,
   rotulo = 'Tirar ou escolher fotos',
   ocupado,
 }: {
   onEscolher: (ficheiros: FicheiroPendente[], erros: string[]) => void;
   aceitarVideo?: boolean;
+  aceitarPdf?: boolean;
   rotulo?: string;
   ocupado?: boolean;
 }) {
@@ -43,8 +49,13 @@ export function SeletorFicheiros({
     for (const f of Array.from(lista)) {
       const video = f.type.startsWith('video/');
       if (video && !aceitarVideo) continue;
+      if (aceitarPdf && f.type === 'application/pdf') {
+        if (f.size > LIMITE_PDF_MB * 1024 * 1024) erros.push(`"${f.name}" tem ${tamanhoLegivel(f.size)} — o máximo para PDF é ${LIMITE_PDF_MB} MB.`);
+        else ok.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, ficheiro: f, nome: f.name, tipo: 'documento', previsualizacao: '' });
+        continue;
+      }
       if (!video && !f.type.startsWith('image/')) {
-        erros.push(`"${f.name}" não é uma imagem nem um vídeo.`);
+        erros.push(aceitarPdf ? `"${f.name}" não é uma imagem nem um PDF.` : `"${f.name}" não é uma imagem nem um vídeo.`);
         continue;
       }
       if (video && f.size > LIMITE_VIDEO_MB * 1024 * 1024) {
@@ -71,8 +82,8 @@ export function SeletorFicheiros({
       <input
         ref={input}
         type="file"
-        accept={aceitarVideo ? 'image/*,video/*' : 'image/*'}
-        capture="environment"
+        accept={aceitarPdf ? 'image/*,application/pdf' : aceitarVideo ? 'image/*,video/*' : 'image/*'}
+        capture={aceitarPdf ? undefined : 'environment'}
         multiple
         className="sr-only"
         tabIndex={-1}
@@ -89,7 +100,7 @@ export function SeletorFicheiros({
         {aCarregar ? <Loader2 size={20} className="animate-spin text-mzd-gray" /> : <Camera size={20} strokeWidth={1.75} />}
         {aCarregar ? 'A preparar…' : rotulo}
         <span className="text-xs font-normal text-mzd-gray">
-          {aceitarVideo ? `Fotos são comprimidas automaticamente · vídeos até ${LIMITE_VIDEO_MB} MB` : 'Fotos são comprimidas automaticamente'}
+          {aceitarPdf ? `Fotografia de cada página ou PDF do digitalizador (até ${LIMITE_PDF_MB} MB)` : aceitarVideo ? `Fotos são comprimidas automaticamente · vídeos até ${LIMITE_VIDEO_MB} MB` : 'Fotos são comprimidas automaticamente'}
         </span>
       </button>
     </>
@@ -103,9 +114,9 @@ export function MiniaturaPendente({ f, onRemover }: { f: FicheiroPendente; onRem
       {f.tipo === 'foto' ? (
         <img src={f.previsualizacao} alt={f.nome} className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-1 text-mzd-gray">
-          <Film size={20} />
-          <span className="text-[10px]">{tamanhoLegivel(f.ficheiro.size)}</span>
+        <div className="flex h-full flex-col items-center justify-center gap-1 px-1 text-center text-mzd-gray">
+          {f.tipo === 'documento' ? <FileText size={20} /> : <Film size={20} />}
+          <span className="line-clamp-2 break-all text-[10px]">{f.tipo === 'documento' ? f.nome : tamanhoLegivel(f.ficheiro.size)}</span>
         </div>
       )}
       {onRemover && (

@@ -25,13 +25,14 @@ export default function Decisao({
   const [motivo, setMotivo] = useState('');
   const aprovar = decisao === 'aprovado';
   const oQue = adicionalId ? 'o trabalho adicional' : 'o orçamento';
+  const verbo = adicionalId ? 'Aprovar' : 'Aceitar';
   const pronto = nome.trim().length >= 3 && (aprovar ? aceito : adicionalId ? true : motivo.trim().length >= 3);
 
   return (
     <Modal
       open
       onClose={onFechar}
-      title={aprovar ? `Aprovar ${oQue}` : `Não aprovar ${oQue}`}
+      title={aprovar ? `${verbo} ${oQue}` : `Não ${verbo.toLowerCase()} ${oQue}`}
       footer={
         <>
           <Button variante="fantasma" onClick={onFechar}>Voltar</Button>
@@ -41,7 +42,7 @@ export default function Decisao({
             carregando={decidir.isPending}
             onClick={() => decidir.mutate({ decisao, nome: nome.trim(), aceito: aprovar ? aceito : undefined, motivo: motivo.trim() || undefined, adicionalId }, { onSuccess: onFechar })}
           >
-            {aprovar ? 'Confirmar aprovação' : 'Confirmar'}
+            {aprovar ? (adicionalId ? 'Confirmar aprovação' : 'Confirmar aceitação') : 'Confirmar'}
           </Button>
         </>
       }
@@ -53,8 +54,9 @@ export default function Decisao({
         </Field>
         {aprovar ? (
           <Checkbox checked={aceito} onChange={setAceito}>
-            Li e aceito {oQue} no valor de <strong className="num">{formatAOA(total)}</strong> (IVA incluído)
-            {condicoes ? <>, com as condições: {condicoes}</> : null}.
+            Li e aceito {oQue} no valor de <strong className="num">{formatAOA(total)}</strong>
+            {condicoes ? <>, com as condições de pagamento ({condicoes}) e os prazos indicados</> : null}.
+            {!adicionalId && <span className="mt-1 block text-xs text-mzd-gray">A seguir mostramos como fazer o pagamento da aceitação.</span>}
           </Checkbox>
         ) : (
           <>
