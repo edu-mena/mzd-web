@@ -141,8 +141,17 @@
 ::-webkit-scrollbar-thumb { background: var(--color-zinc-300); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-400); }
 
+/* ---------- Documentos oficiais ---------- */
+/* Texto a 10 pt; rótulos, títulos de secção e notas numa escala fixa, igual no ecrã e no papel.
+   Sem camada (@layer): sobrepõe-se aos tamanhos dos utilitários usados dentro dos documentos. */
+.documento { font-size: 10pt; line-height: 1.4; }
+.documento :is(.text-sm, .text-\[13px\], .text-\[12\.5px\], .text-\[15px\]) { font-size: 10pt; }
+.documento :is(.text-xs, .text-\[11px\]) { font-size: 8.5pt; }
+.documento .text-\[10px\] { font-size: 7.5pt; }
+.documento .text-base { font-size: 11.5pt; }
+
 @media print {
-  @page { size: A4; margin: 10mm; }
+  @page { size: A4; margin: 12mm 12mm 10mm; }
   .no-print { display: none !important; }
   body { background: white; }
   .pagina > * { animation: none; }

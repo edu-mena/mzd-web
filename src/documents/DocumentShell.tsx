@@ -28,23 +28,24 @@ export default function DocumentShell({
         </button>
       </div>
 
-      <div className="px-4 py-6 text-[13px] text-mzd-black sm:px-8 sm:py-8 print:px-8 print:py-8">
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b-2 border-mzd-black pb-4">
-          <div className="flex flex-col gap-1.5">
-            <img src={logoMzd} alt="Grupo MZD — MZD Carros e Motores" className="h-12 w-auto" />
-            {e && (
-              <p className="text-[10px] leading-tight text-mzd-gray">
-                {e.nome} · NIF {e.nif}
-                <br />
-                {e.morada} · {e.telefone} · {e.email}
-              </p>
-            )}
+      <div className="documento px-4 py-6 text-mzd-black sm:px-8 sm:py-8 print:p-0">
+        <header className="mb-5 border-b-2 border-mzd-black pb-3">
+          <div className="flex items-start justify-between gap-6">
+            {/* Altura fixa e largura proporcional: o logótipo nunca estica. */}
+            <img src={logoMzd} alt="Grupo MZD — MZD Carros e Motores" className="h-[14mm] w-auto max-w-[45%] shrink-0 self-start object-contain object-left" />
+            <div className="min-w-0 text-right">
+              <h1 className="font-display text-[13pt] font-extrabold uppercase leading-tight tracking-wide text-mzd-red [font-stretch:110%]">{title}</h1>
+              {subtitle && <p className="text-xs text-mzd-gray">{subtitle}</p>}
+              <p className="num mt-1 text-sm font-semibold text-mzd-black">Nº {numero}</p>
+            </div>
           </div>
-          <div className="text-right">
-            <h1 className="text-sm font-extrabold uppercase tracking-wide text-mzd-red">{title}</h1>
-            {subtitle && <p className="text-xs text-mzd-gray">{subtitle}</p>}
-            <p className="num mt-1 text-xs font-semibold text-mzd-black">Nº {numero}</p>
-          </div>
+          {e && (
+            <p className="mt-2.5 text-[10px] leading-snug text-mzd-gray">
+              <span className="font-semibold text-mzd-black">{e.nome}</span> · NIF <span className="num">{e.nif}</span>
+              <br />
+              {e.morada} · Tel. <span className="num">{e.telefone}</span> · {e.email}
+            </p>
+          )}
         </header>
 
         {children}
